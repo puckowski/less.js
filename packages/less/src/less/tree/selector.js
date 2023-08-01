@@ -4,7 +4,7 @@ import LessError from '../less-error';
 import * as utils from '../utils';
 import Parser from '../parser/parser';
 
-const Selector = function(elements, extendList, condition, index, currentFileInfo, visibilityInfo) {
+const Selector = function (elements, extendList, condition, index, currentFileInfo, visibilityInfo) {
     this.extendList = extendList;
     this.condition = condition;
     this.evaldCondition = !condition;
@@ -48,7 +48,7 @@ Selector.prototype = Object.assign(new Node(), {
             new Parser(this.parse.context, this.parse.importManager, this._fileInfo, this._index).parseNode(
                 els,
                 ['selector'],
-                function(err, result) {
+                function (err, result) {
                     if (err) {
                         throw new LessError({
                             index: err.index,
@@ -93,7 +93,7 @@ Selector.prototype = Object.assign(new Node(), {
             return this.mixinElements_;
         }
 
-        let elements = this.elements.map( function(v) {
+        let elements = this.elements.map(function (v) {
             return v.combinator.value + (v.value.value || v.value);
         }).join('').match(/[,&#*.\w-]([\w-]|(\\.))*/g);
 
@@ -121,7 +121,7 @@ Selector.prototype = Object.assign(new Node(), {
         let extendList = this.extendList;
 
         elements = elements && elements.map(function (e) { return e.eval(context); });
-        extendList = extendList && extendList.map(function(extend) { return extend.eval(context); });
+        extendList = extendList && extendList.map(function (extend) { return extend.eval(context); });
 
         return this.createDerived(elements, extendList, evaldCondition);
     },
@@ -132,6 +132,7 @@ Selector.prototype = Object.assign(new Node(), {
             output.add(' ', this.fileInfo(), this.getIndex());
         }
         for (i = 0; i < this.elements.length; i++) {
+            //if (context && context.firstSelector && this.elements[i].value === '&' && this.elements.length > 1) continue;
             element = this.elements[i];
             element.genCSS(context, output);
         }

@@ -13,7 +13,7 @@ import getDebugInfo from './debug-info';
 import * as utils from '../utils';
 import Parser from '../parser/parser';
 
-const Ruleset = function(selectors, rules, strictImports, visibilityInfo) {
+const Ruleset = function (selectors, rules, strictImports, visibilityInfo) {
     this.selectors = selectors;
     this.rules = rules;
     this._lookups = {};
@@ -84,7 +84,7 @@ Ruleset.prototype = Object.assign(new Node(), {
                 new Parser(context, this.parse.importManager, selectorFileInfo, startingIndex).parseNode(
                     toParseSelectors.join(','),
                     ['selectors'],
-                    function(err, result) {
+                    function (err, result) {
                         if (result) {
                             selectors = utils.flattenArray(result);
                         }
@@ -120,9 +120,9 @@ Ruleset.prototype = Object.assign(new Node(), {
             let i = 0;
             const n = frames.length;
             let found;
-            for ( ; i !== n ; ++i ) {
-                found = frames[ i ].functionRegistry;
-                if ( found ) { return found; }
+            for (; i !== n; ++i) {
+                found = frames[i].functionRegistry;
+                if (found) { return found; }
             }
             return globalFunctionRegistry;
         }(context.frames)).inherit();
@@ -158,7 +158,7 @@ Ruleset.prototype = Object.assign(new Node(), {
         for (i = 0; (rule = rsRules[i]); i++) {
             if (rule.type === 'MixinCall') {
                 /* jshint loopfunc:true */
-                rules = rule.eval(context).filter(function(r) {
+                rules = rule.eval(context).filter(function (r) {
                     if ((r instanceof Declaration) && r.variable) {
                         // do not pollute the scope if the variable is
                         // already there. consider returning false here
@@ -170,9 +170,9 @@ Ruleset.prototype = Object.assign(new Node(), {
                 rsRules.splice.apply(rsRules, [i, 1].concat(rules));
                 i += rules.length - 1;
                 ruleset.resetCache();
-            } else if (rule.type ===  'VariableCall') {
+            } else if (rule.type === 'VariableCall') {
                 /* jshint loopfunc:true */
-                rules = rule.eval(context).rules.filter(function(r) {
+                rules = rule.eval(context).rules.filter(function (r) {
                     if ((r instanceof Declaration) && r.variable) {
                         // do not pollute the scope at all
                         return false;
@@ -315,7 +315,7 @@ Ruleset.prototype = Object.assign(new Node(), {
                         r.name[0].value : r.name;
                     // Properties don't overwrite as they can merge
                     if (!hash[`$${name}`]) {
-                        hash[`$${name}`] = [ r ];
+                        hash[`$${name}`] = [r];
                     }
                     else {
                         hash[`$${name}`].push(r);
@@ -358,7 +358,7 @@ Ruleset.prototype = Object.assign(new Node(), {
                     new Parser(this.parse.context, this.parse.importManager, decl.fileInfo(), decl.value.getIndex()).parseNode(
                         decl.value.value,
                         ['value', 'important'],
-                        function(err, result) {
+                        function (err, result) {
                             if (err) {
                                 decl.parsed = true;
                             }
@@ -383,7 +383,7 @@ Ruleset.prototype = Object.assign(new Node(), {
         }
         else {
             const nodes = [];
-            toParse.forEach(function(n) {
+            toParse.forEach(function (n) {
                 nodes.push(transformDeclaration.call(self, n));
             });
             return nodes;
@@ -412,7 +412,7 @@ Ruleset.prototype = Object.assign(new Node(), {
         if (rules) {
             rules.unshift(rule);
         } else {
-            this.rules = [ rule ];
+            this.rules = [rule];
         }
         this.setParent(rule, this);
     },
@@ -440,7 +440,7 @@ Ruleset.prototype = Object.assign(new Node(), {
                                 Array.prototype.push.apply(rules, foundMixins);
                             }
                         } else {
-                            rules.push({ rule, path: []});
+                            rules.push({ rule, path: [] });
                         }
                         break;
                     }
@@ -506,7 +506,7 @@ Ruleset.prototype = Object.assign(new Node(), {
 
             const paths = this.paths;
             const pathCnt = paths.length;
-            let pathSubCnt;
+            let pathSubCnt, appendedAmp;
 
             sep = context.compress ? ',' : (`,\n${tabSetStr}`);
 
@@ -516,11 +516,18 @@ Ruleset.prototype = Object.assign(new Node(), {
                 if (i > 0) { output.add(sep); }
 
                 context.firstSelector = true;
-                path[0].genCSS(context, output);
-
+                if (pathSubCnt > 1 && path[0].elements.length === 1 && path[0].elements[0].value === '&') {
+                    appendedAmp = true;
+                } else {
+                    path[0].genCSS(context, output);
+                    appendedAmp = true;
+                }
                 context.firstSelector = false;
                 for (j = 1; j < pathSubCnt; j++) {
+                    if (j === 0 && pathSubCnt > 1 && path[j].elements.length === 1 && path[j].elements[0].value === '&') continue;
+                    else if (path[j].elements[0].value === '&' && appendedAmp) continue;
                     path[j].genCSS(context, output);
+                    appendedAmp = true;
                 }
             }
 
@@ -564,13 +571,13 @@ Ruleset.prototype = Object.assign(new Node(), {
         }
     },
 
-    joinSelectors(paths, context, selectors) {
+    joinSelectors(paths, context, selectors, visitArgs) {
         for (let s = 0; s < selectors.length; s++) {
-            this.joinSelector(paths, context, selectors[s]);
+            this.joinSelector(paths, context, selectors[s], visitArgs);
         }
     },
 
-    joinSelector(paths, context, selector) {
+    joinSelector(paths, context, selector, visitArgs) {
 
         function createParenthesis(elementsToPak, originalElement) {
             let replacementParen, j;
@@ -660,7 +667,7 @@ Ruleset.prototype = Object.assign(new Node(), {
         // joins selector path from `beginningPath` with every selector path in `addPaths` array
         // `replacedElement` contains element that is being replaced by `addPath`
         // returns array with all concatenated paths
-        function addAllReplacementsIntoPath( beginningPath, addPaths, replacedElement, originalSelector, result) {
+        function addAllReplacementsIntoPath(beginningPath, addPaths, replacedElement, originalSelector, result) {
             let j;
             for (j = 0; j < beginningPath.length; j++) {
                 const newSelectorPath = addReplacementIntoPath(beginningPath[j], addPaths, replacedElement, originalSelector);
@@ -673,10 +680,10 @@ Ruleset.prototype = Object.assign(new Node(), {
             let i, sel;
 
             if (elements.length === 0) {
-                return ;
+                return;
             }
             if (selectors.length === 0) {
-                selectors.push([ new Selector(elements) ]);
+                selectors.push([new Selector(elements)]);
                 return;
             }
 
@@ -754,6 +761,8 @@ Ruleset.prototype = Object.assign(new Node(), {
                         currentElements.push(el);
                     }
 
+                } else if (el.value === '&' && el.combinator.value === '' && visitArgs && visitArgs.preserve) {
+                    currentElements.push(new Element(el.value));
                 } else {
                     hadParentSelector = true;
                     // the new list of selectors to add
@@ -820,7 +829,7 @@ Ruleset.prototype = Object.assign(new Node(), {
         let i, newPaths, hadParentSelector;
 
         newPaths = [];
-        hadParentSelector = replaceParentSelector(newPaths, context, selector);
+        hadParentSelector = replaceParentSelector(newPaths, context, selector, visitArgs);
 
         if (!hadParentSelector) {
             if (context.length > 0) {
