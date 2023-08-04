@@ -4907,14 +4907,7 @@
                                 parserInput.restore();
                                 e = this.value();
                             }
-                            if (!p && syntaxOptions.queryInParens) {
-                                parserInput.restore();
-                                p = this.selector();
-                                if (p) {
-                                    nodes.push(p);
-                                }
-                            }
-                            else if (parserInput.$char(')')) {
+                            if (parserInput.$char(')')) {
                                 if (p && !e) {
                                     nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));
                                     e = p;
@@ -4927,6 +4920,13 @@
                                 }
                                 else {
                                     error('badly formed media feature definition');
+                                }
+                            }
+                            else if (!p && syntaxOptions.queryInParens) {
+                                parserInput.restore();
+                                p = this.selector();
+                                if (p) {
+                                    nodes.push(p);
                                 }
                             }
                             else {

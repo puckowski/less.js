@@ -404,7 +404,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 },
 
                 mediaKeyword: function () {
-                    const k = parserInput.$char('%') || parserInput.$re(/^\[?(?:[&\w-]|\\(?:[A-Fa-f0-9]{1,6} ?|[^A-Fa-f0-9]))+\]?/);       
+                    const k = parserInput.$char('%') || parserInput.$re(/^\[?(?:[&\w-]|\\(?:[A-Fa-f0-9]{1,6} ?|[^A-Fa-f0-9]))+\]?/);
                     if (k) {
                         return tree.Color.fromKeyword(k) || new (tree.Keyword)(k);
                     }
@@ -1788,17 +1788,9 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             e = this.value();
                         }
 
-                        if (!p && syntaxOptions.queryInParens) {
-                            parserInput.restore();
-                            p = this.selector();
-                            if (p) {
-                                nodes.push(p);
-                            } else {
-
-                            }
-                        } else if (parserInput.$char(')')) {
+                        if (parserInput.$char(')')) {
                             if (p && !e) {
-                                nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));				 
+                                nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));
                                 e = p;
                             } else if (p && e) {
                                 nodes.push(new (tree.Paren)(new (tree.Declaration)(p, e, null, null, parserInput.i + currentIndex, fileInfo, true)));
@@ -1806,6 +1798,12 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                                 nodes.push(new (tree.Paren)(e));
                             } else {
                                 error('badly formed media feature definition');
+                            }
+                        } else if (!p && syntaxOptions.queryInParens) {
+                            parserInput.restore();
+                            p = this.selector();
+                            if (p) {
+                                nodes.push(p);
                             }
                         } else {
                             error('Missing closing \')\'', 'Parse');
@@ -2322,7 +2320,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         } else {
                             error('expected expression');
                         }
-                    } else {
+                    } else if (!preparsedCond) {
                         c = new (tree.Condition)('=', a, new (tree.Keyword)('true'), index + currentIndex, false);
                     }
                     return c;
