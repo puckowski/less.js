@@ -403,6 +403,13 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                 },
 
+                mediaKeyword: function () {
+                    const k = parserInput.$char('%') || parserInput.$re(/^\[?(?:[&\w-]|\\(?:[A-Fa-f0-9]{1,6} ?|[^A-Fa-f0-9]))+\]?/);       
+                    if (k) {
+                        return tree.Color.fromKeyword(k) || new (tree.Keyword)(k);
+                    }
+                },
+
                 //
                 // A function call
                 //
@@ -1758,17 +1765,24 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 const nodes = [];
                 let e;
                 let p;
+                let rangeP;
                 parserInput.save();
                 do {
-                    e = entities.keyword() || entities.variable() || entities.mixinLookup();
+                    e = entities.mediaKeyword() || entities.variable() || entities.mixinLookup();
                     if (e) {
                         nodes.push(e);
                     } else if (parserInput.$char('(')) {
                         p = this.property();
                         parserInput.save();
-                        if (!p && syntaxOptions.queryInParens && parserInput.$re(/^[a-z-]*\s*([<>]=|<=|>=|[<>]|=)/)) {
+                        if (!p && syntaxOptions.queryInParens && parserInput.$re(/^[0-9a-z-]*\s*([<>]=|<=|>=|[<>]|=)/)) {
                             parserInput.restore();
                             p = this.condition();
+
+                            parserInput.save();
+                            rangeP = this.atomicCondition(null, p.rvalue);
+                            if (!rangeP) {
+                                parserInput.restore();
+                            }
                         } else {
                             parserInput.restore();
                             e = this.value();
@@ -1784,7 +1798,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             }
                         } else if (parserInput.$char(')')) {
                             if (p && !e) {
-                                nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, p._index)));
+                                nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));				 
                                 e = p;
                             } else if (p && e) {
                                 nodes.push(new (tree.Paren)(new (tree.Declaration)(p, e, null, null, parserInput.i + currentIndex, fileInfo, true)));
@@ -2259,7 +2273,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 parserInput.forget();
                 return body;
             },
-            atomicCondition: function () {
+            atomicCondition: function (needsParens, preparsedCond) {
                 const entities = this.entities;
                 const index = parserInput.i;
                 let a;
@@ -2271,7 +2285,12 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     return this.addition() || entities.keyword() || entities.quoted() || entities.mixinLookup();
                 }).bind(this)
 
-                a = cond();
+                if (preparsedCond) {
+                    a = preparsedCond;
+                } else {
+                    a = cond();
+                }
+
                 if (a) {
                     if (parserInput.$char('>')) {
                         if (parserInput.$char('=')) {
