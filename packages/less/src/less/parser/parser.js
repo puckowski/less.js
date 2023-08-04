@@ -4,7 +4,7 @@ import visitors from '../visitors';
 import getParserInput from './parser-input';
 import * as utils from '../utils';
 import functionRegistry from '../functions/function-registry';
-import { ContainerSyntaxOptions, MediaSyntaxOptions } from '../tree/atrule-syntax';
+import { ContainerSyntaxOptions, MediaSyntaxOptions, ScopeSyntaxOptions } from '../tree/atrule-syntax';
 
 //
 // less.js - parser
@@ -149,7 +149,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
             // Optionally disable @plugin parsing
             if (additionalData && additionalData.disablePluginRule) {
-                parsers.plugin = function() {
+                parsers.plugin = function () {
                     var dir = parserInput.$re(/^@plugin?\s+/);
                     if (dir) {
                         error('@plugin statements are not allowed when disablePluginRule is set to true');
@@ -352,7 +352,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
             comment: function () {
                 if (parserInput.commentStore.length) {
                     const comment = parserInput.commentStore.shift();
-                    return new(tree.Comment)(comment.text, comment.isLineComment, comment.index + currentIndex, fileInfo);
+                    return new (tree.Comment)(comment.text, comment.isLineComment, comment.index + currentIndex, fileInfo);
                 }
             },
 
@@ -360,7 +360,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
             // Entities are tokens which can be found inside an Expression
             //
             entities: {
-                mixinLookup: function() {
+                mixinLookup: function () {
                     return parsers.mixin.call(true, true);
                 },
                 //
@@ -388,7 +388,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                     parserInput.forget();
 
-                    return new(tree.Quoted)(str.charAt(0), str.substr(1, str.length - 2), isEscaped, index + currentIndex, fileInfo);
+                    return new (tree.Quoted)(str.charAt(0), str.substr(1, str.length - 2), isEscaped, index + currentIndex, fileInfo);
                 },
 
                 //
@@ -399,7 +399,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 keyword: function () {
                     const k = parserInput.$char('%') || parserInput.$re(/^\[?(?:[\w-]|\\(?:[A-Fa-f0-9]{1,6} ?|[^A-Fa-f0-9]))+\]?/);
                     if (k) {
-                        return tree.Color.fromKeyword(k) || new(tree.Keyword)(k);
+                        return tree.Color.fromKeyword(k) || new (tree.Keyword)(k);
                     }
                 },
 
@@ -455,7 +455,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                     parserInput.forget();
 
-                    return new(tree.Call)(name, args, index + currentIndex, fileInfo);
+                    return new (tree.Call)(name, args, index + currentIndex, fileInfo);
                 },
 
                 //
@@ -472,9 +472,9 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                        but it's quite tricky since it relies on all these `parsers`
                        and `expect` available only here */
                     return {
-                        alpha:   f(parsers.ieAlpha, true),
+                        alpha: f(parsers.ieAlpha, true),
                         boolean: f(condition),
-                        'if':    f(condition)
+                        'if': f(condition)
                     }[name.toLowerCase()];
 
                     function f(parse, stop) {
@@ -532,9 +532,9 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 },
                 literal: function () {
                     return this.dimension() ||
-                           this.color() ||
-                           this.quoted() ||
-                           this.unicodeDescriptor();
+                        this.color() ||
+                        this.quoted() ||
+                        this.unicodeDescriptor();
                 },
 
                 // Assignments are argument entities for calls.
@@ -559,7 +559,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     value = parsers.entity();
                     if (value) {
                         parserInput.forget();
-                        return new(tree.Assignment)(key, value);
+                        return new (tree.Assignment)(key, value);
                     } else {
                         parserInput.restore();
                     }
@@ -584,16 +584,16 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
 
                     value = this.quoted() || this.variable() || this.property() ||
-                            parserInput.$re(/^(?:(?:\\[()'"])|[^()'"])+/) || '';
+                        parserInput.$re(/^(?:(?:\\[()'"])|[^()'"])+/) || '';
 
                     parserInput.autoCommentAbsorb = true;
 
                     expectChar(')');
 
-                    return new(tree.URL)((value.value !== undefined ||
+                    return new (tree.URL)((value.value !== undefined ||
                         value instanceof tree.Variable ||
                         value instanceof tree.Property) ?
-                        value : new(tree.Anonymous)(value, index), index + currentIndex, fileInfo);
+                        value : new (tree.Anonymous)(value, index), index + currentIndex, fileInfo);
                 },
 
                 //
@@ -621,7 +621,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             }
                         }
                         parserInput.forget();
-                        return new(tree.Variable)(name, index + currentIndex, fileInfo);
+                        return new (tree.Variable)(name, index + currentIndex, fileInfo);
                     }
                     parserInput.restore();
                 },
@@ -632,7 +632,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     const index = parserInput.i;
 
                     if (parserInput.currentChar() === '@' && (curly = parserInput.$re(/^@\{([\w-]+)\}/))) {
-                        return new(tree.Variable)(`@${curly[1]}`, index + currentIndex, fileInfo);
+                        return new (tree.Variable)(`@${curly[1]}`, index + currentIndex, fileInfo);
                     }
                 },
                 //
@@ -645,7 +645,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     const index = parserInput.i;
 
                     if (parserInput.currentChar() === '$' && (name = parserInput.$re(/^\$[\w-]+/))) {
-                        return new(tree.Property)(name, index + currentIndex, fileInfo);
+                        return new (tree.Property)(name, index + currentIndex, fileInfo);
                     }
                 },
 
@@ -655,7 +655,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     const index = parserInput.i;
 
                     if (parserInput.currentChar() === '$' && (curly = parserInput.$re(/^\$\{([\w-]+)\}/))) {
-                        return new(tree.Property)(`$${curly[1]}`, index + currentIndex, fileInfo);
+                        return new (tree.Property)(`$${curly[1]}`, index + currentIndex, fileInfo);
                     }
                 },
                 //
@@ -672,7 +672,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     if (parserInput.currentChar() === '#' && (rgb = parserInput.$re(/^#([A-Fa-f0-9]{8}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{3,4})([\w.#[])?/))) {
                         if (!rgb[2]) {
                             parserInput.forget();
-                            return new(tree.Color)(rgb[1], undefined, rgb[0]);
+                            return new (tree.Color)(rgb[1], undefined, rgb[0]);
                         }
                     }
                     parserInput.restore();
@@ -708,7 +708,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                     const value = parserInput.$re(/^([+-]?\d*\.?\d+)(%|[a-z_]+)?/i);
                     if (value) {
-                        return new(tree.Dimension)(value[1], value[2]);
+                        return new (tree.Dimension)(value[1], value[2]);
                     }
                 },
 
@@ -722,7 +722,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                     ud = parserInput.$re(/^U\+[0-9a-fA-F?]+(-[0-9a-fA-F?]+)?/);
                     if (ud) {
-                        return new(tree.UnicodeDescriptor)(ud[0]);
+                        return new (tree.UnicodeDescriptor)(ud[0]);
                     }
                 },
 
@@ -748,7 +748,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     js = parserInput.$re(/^[^`]*`/);
                     if (js) {
                         parserInput.forget();
-                        return new(tree.JavaScript)(js.substr(0, js.length - 1), Boolean(escape), index + currentIndex, fileInfo);
+                        return new (tree.JavaScript)(js.substr(0, js.length - 1), Boolean(escape), index + currentIndex, fileInfo);
                     }
                     parserInput.restore('invalid javascript definition');
                 }
@@ -812,7 +812,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
             //
             // extend syntax - used to extend selectors
             //
-            extend: function(isRule) {
+            extend: function (isRule) {
                 let elements;
                 let e;
                 const index = parserInput.i;
@@ -835,7 +835,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (elements) {
                             elements.push(e);
                         } else {
-                            elements = [ e ];
+                            elements = [e];
                         }
                     }
 
@@ -843,11 +843,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     if (!elements) {
                         error('Missing target selector for :extend().');
                     }
-                    extend = new(tree.Extend)(new(tree.Selector)(elements), option, index + currentIndex, fileInfo);
+                    extend = new (tree.Extend)(new (tree.Selector)(elements), option, index + currentIndex, fileInfo);
                     if (extendList) {
                         extendList.push(extend);
                     } else {
-                        extendList = [ extend ];
+                        extendList = [extend];
                     }
                 } while (parserInput.$char(','));
 
@@ -863,7 +863,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
             //
             // extendRule - used in a rule to extend all the parent selectors
             //
-            extendRule: function() {
+            extendRule: function () {
                 return this.extend(true);
             },
 
@@ -929,7 +929,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                         if (inValue || parsers.end()) {
                             parserInput.forget();
-                            const mixin = new(tree.mixin.Call)(elements, args, index + currentIndex, fileInfo, !lookups && important);
+                            const mixin = new (tree.mixin.Call)(elements, args, index + currentIndex, fileInfo, !lookups && important);
                             if (lookups) {
                                 return new tree.NamespaceValue(mixin, lookups);
                             }
@@ -945,7 +945,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                  * Matching elements for mixins
                  * (Start with . or # and can have > )
                  */
-                elements: function() {
+                elements: function () {
                     let elements;
                     let e;
                     let c;
@@ -959,11 +959,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (!e) {
                             break;
                         }
-                        elem = new(tree.Element)(c, e, false, elemIndex + currentIndex, fileInfo);
+                        elem = new (tree.Element)(c, e, false, elemIndex + currentIndex, fileInfo);
                         if (elements) {
                             elements.push(elem);
                         } else {
-                            elements = [ elem ];
+                            elements = [elem];
                         }
                         c = parserInput.$char('>');
                     }
@@ -971,7 +971,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 },
                 args: function (isCall) {
                     const entities = parsers.entities;
-                    const returner = { args:null, variadic: false };
+                    const returner = { args: null, variadic: false };
                     let expressions = [];
                     const argsSemiColon = [];
                     const argsComma = [];
@@ -1066,7 +1066,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             expressions.push(value);
                         }
 
-                        argsComma.push({ name:nameLoop, value, expand });
+                        argsComma.push({ name: nameLoop, value, expand });
 
                         if (parserInput.$char(',')) {
                             hasSep = true;
@@ -1083,7 +1083,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             isSemiColonSeparated = true;
 
                             if (expressions.length > 1) {
-                                value = new(tree.Value)(expressions);
+                                value = new (tree.Value)(expressions);
                             }
                             argsSemiColon.push({ name, value, expand });
 
@@ -1158,7 +1158,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                         if (ruleset) {
                             parserInput.forget();
-                            return new(tree.mixin.Definition)(name, params, ruleset, cond, variadic);
+                            return new (tree.mixin.Definition)(name, params, ruleset, cond, variadic);
                         } else {
                             parserInput.restore();
                         }
@@ -1167,7 +1167,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                 },
 
-                ruleLookups: function() {
+                ruleLookups: function () {
                     let rule;
                     const lookups = [];
 
@@ -1190,7 +1190,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                 },
 
-                lookupValue: function() {
+                lookupValue: function () {
                     parserInput.save();
 
                     if (!parserInput.$char('[')) {
@@ -1277,14 +1277,14 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     // eslint-disable-next-line no-control-regex
                     parserInput.$re(/^(?:[.#]?|:*)(?:[\w-]|[^\x00-\x9f]|\\(?:[A-Fa-f0-9]{1,6} ?|[^A-Fa-f0-9]))+/) ||
                     parserInput.$char('*') || parserInput.$char('&') || this.attribute() ||
-                    parserInput.$re(/^\([^&()@]+\)/) ||  parserInput.$re(/^[.#:](?=@)/) ||
+                    parserInput.$re(/^\([^&()@]+\)/) || parserInput.$re(/^[.#:](?=@)/) ||
                     this.entities.variableCurly();
 
                 if (!e) {
                     parserInput.save();
                     if (parserInput.$char('(')) {
                         if ((v = this.selector(false)) && parserInput.$char(')')) {
-                            e = new(tree.Paren)(v);
+                            e = new (tree.Paren)(v);
                             parserInput.forget();
                         } else {
                             parserInput.restore('Missing closing \')\'');
@@ -1294,7 +1294,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                 }
 
-                if (e) { return new(tree.Element)(c, e, e instanceof tree.Variable, index + currentIndex, fileInfo); }
+                if (e) { return new (tree.Element)(c, e, e instanceof tree.Variable, index + currentIndex, fileInfo); }
             },
 
             //
@@ -1314,7 +1314,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     const slashedCombinator = parserInput.$re(/^\/[a-z]+\//i);
                     if (slashedCombinator) {
                         parserInput.forget();
-                        return new(tree.Combinator)(slashedCombinator);
+                        return new (tree.Combinator)(slashedCombinator);
                     }
                     parserInput.restore();
                 }
@@ -1326,11 +1326,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         parserInput.i++;
                     }
                     while (parserInput.isWhitespace()) { parserInput.i++; }
-                    return new(tree.Combinator)(c);
+                    return new (tree.Combinator)(c);
                 } else if (parserInput.isWhitespace(-1)) {
-                    return new(tree.Combinator)(' ');
+                    return new (tree.Combinator)(' ');
                 } else {
-                    return new(tree.Combinator)(null);
+                    return new (tree.Combinator)(null);
                 }
             },
             //
@@ -1369,7 +1369,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (elements) {
                             elements.push(e);
                         } else {
-                            elements = [ e ];
+                            elements = [e];
                         }
                         e = null;
                     }
@@ -1378,7 +1378,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                 }
 
-                if (elements) { return new(tree.Selector)(elements, allExtends, condition, index + currentIndex, fileInfo); }
+                if (elements) { return new (tree.Selector)(elements, allExtends, condition, index + currentIndex, fileInfo); }
                 if (allExtends) { error('Extend must be used to extend a selector, it cannot be used on its own'); }
             },
             selectors: function () {
@@ -1392,7 +1392,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     if (selectors) {
                         selectors.push(s);
                     } else {
-                        selectors = [ s ];
+                        selectors = [s];
                     }
                     parserInput.commentStore.length = 0;
                     if (s.condition && selectors.length > 1) {
@@ -1433,7 +1433,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 expectChar(']');
 
-                return new(tree.Attribute)(key, op, val, cif);
+                return new (tree.Attribute)(key, op, val, cif);
             },
 
             //
@@ -1447,7 +1447,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 }
             },
 
-            blockRuleset: function() {
+            blockRuleset: function () {
                 let block = this.block();
 
                 if (block) {
@@ -1456,7 +1456,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 return block;
             },
 
-            detachedRuleset: function() {
+            detachedRuleset: function () {
                 let argInfo;
                 let params;
                 let variadic;
@@ -1506,7 +1506,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 if (selectors && (rules = this.block())) {
                     parserInput.forget();
-                    const ruleset = new(tree.Ruleset)(selectors, rules, context.strictImports);
+                    const ruleset = new (tree.Ruleset)(selectors, rules, context.strictImports);
                     if (context.dumpLineNumbers) {
                         ruleset.debugInfo = debugInfo;
                     }
@@ -1559,7 +1559,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (value) {
                             parserInput.forget();
                             // anonymous values absorb the end ';' which is required for them to work
-                            return new(tree.Declaration)(name, value, false, merge, index + currentIndex, fileInfo);
+                            return new (tree.Declaration)(name, value, false, merge, index + currentIndex, fileInfo);
                         }
 
                         if (!value) {
@@ -1576,7 +1576,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                     if (value && (this.end() || hasDR)) {
                         parserInput.forget();
-                        return new(tree.Declaration)(name, value, important, merge, index + currentIndex, fileInfo);
+                        return new (tree.Declaration)(name, value, important, merge, index + currentIndex, fileInfo);
                     }
                     else {
                         parserInput.restore();
@@ -1589,7 +1589,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 const index = parserInput.i;
                 const match = parserInput.$re(/^([^.#@$+/'"*`(;{}-]*);/);
                 if (match) {
-                    return new(tree.Anonymous)(match[1], index + currentIndex);
+                    return new (tree.Anonymous)(match[1], index + currentIndex);
                 }
             },
             /**
@@ -1637,7 +1637,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 done = testCurrentChar();
 
                 if (value.length > 0) {
-                    value = new(tree.Expression)(value);
+                    value = new (tree.Expression)(value);
                     if (done) {
                         return value;
                     }
@@ -1712,8 +1712,8 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             parserInput.i = index;
                             error('missing semi-colon or unrecognised media features on import');
                         }
-                        features = features && new(tree.Value)(features);
-                        return new(tree.Import)(path, features, options, index + currentIndex, fileInfo);
+                        features = features && new (tree.Value)(features);
+                        return new (tree.Import)(path, features, options, index + currentIndex, fileInfo);
                     }
                     else {
                         parserInput.i = index;
@@ -1722,7 +1722,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 }
             },
 
-            importOptions: function() {
+            importOptions: function () {
                 let o;
                 const options = {};
                 let optionName;
@@ -1753,7 +1753,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 return options;
             },
 
-            importOption: function() {
+            importOption: function () {
                 const opt = parserInput.$re(/^(less|css|multiple|once|inline|reference|optional)/);
                 if (opt) {
                     return opt[1];
@@ -1787,14 +1787,23 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             parserInput.restore();
                             e = this.value();
                         }
-                        if (parserInput.$char(')')) {
+
+                        if (!p && syntaxOptions.queryInParens) {
+                            parserInput.restore();
+                            p = this.selector();
+                            if (p) {
+                                nodes.push(p);
+                            } else {
+
+                            }
+                        } else if (parserInput.$char(')')) {
                             if (p && !e) {
                                 nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));				 
                                 e = p;
                             } else if (p && e) {
                                 nodes.push(new (tree.Paren)(new (tree.Declaration)(p, e, null, null, parserInput.i + currentIndex, fileInfo, true)));
                             } else if (e) {
-                                nodes.push(new(tree.Paren)(e));
+                                nodes.push(new (tree.Paren)(e));
                             } else {
                                 error('badly formed media feature definition');
                             }
@@ -1806,7 +1815,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 parserInput.forget();
                 if (nodes.length > 0) {
-                    return new(tree.Expression)(nodes);
+                    return new (tree.Expression)(nodes);
                 }
             },
 
@@ -1863,12 +1872,14 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     if (parserInput.$str('@media')) {
                         return this.prepareAndGetNestableAtRule(tree.Media, index, debugInfo, MediaSyntaxOptions);
                     }
-                    
-                    if (parserInput.$str('@container')) {
+                    else if (parserInput.$str('@container')) {
                         return this.prepareAndGetNestableAtRule(tree.Container, index, debugInfo, ContainerSyntaxOptions);
                     }
+                    else if (parserInput.$str('@scope')) {
+                        return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
+                    }
                 }
-                
+
                 parserInput.restore();
             },
 
@@ -1883,7 +1894,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 let args;
                 let options;
                 const index = parserInput.i;
-                const dir   = parserInput.$re(/^@plugin\s+/);
+                const dir = parserInput.$re(/^@plugin\s+/);
 
                 if (dir) {
                     args = this.pluginArgs();
@@ -1904,7 +1915,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             parserInput.i = index;
                             error('missing semi-colon on @plugin');
                         }
-                        return new(tree.Import)(path, null, options, index + currentIndex, fileInfo);
+                        return new (tree.Import)(path, null, options, index + currentIndex, fileInfo);
                     }
                     else {
                         parserInput.i = index;
@@ -1913,7 +1924,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 }
             },
 
-            pluginArgs: function() {
+            pluginArgs: function () {
                 // list of options, surrounded by parens
                 parserInput.save();
                 if (!parserInput.$char('(')) {
@@ -2020,7 +2031,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 if (rules || (!hasBlock && value && parserInput.$char(';'))) {
                     parserInput.forget();
-                    return new(tree.AtRule)(name, value, rules, index + currentIndex, fileInfo,
+                    return new (tree.AtRule)(name, value, rules, index + currentIndex, fileInfo,
                         context.dumpLineNumbers ? getDebugInfo(index) : null,
                         isRooted
                     );
@@ -2051,7 +2062,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 } while (e);
 
                 if (expressions.length > 0) {
-                    return new(tree.Value)(expressions, index + currentIndex);
+                    return new (tree.Value)(expressions, index + currentIndex);
                 }
             },
             important: function () {
@@ -2068,7 +2079,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     a = this.addition();
                     if (a && parserInput.$char(')')) {
                         parserInput.forget();
-                        e = new(tree.Expression)([a]);
+                        e = new (tree.Expression)([a]);
                         e.parens = true;
                         return e;
                     }
@@ -2104,7 +2115,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                         m.parensInOp = true;
                         a.parensInOp = true;
-                        operation = new(tree.Operation)(op, [operation || m, a], isSpaced);
+                        operation = new (tree.Operation)(op, [operation || m, a], isSpaced);
                         isSpaced = parserInput.isWhitespace(-1);
                     }
                     return operation || m;
@@ -2131,7 +2142,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                         m.parensInOp = true;
                         a.parensInOp = true;
-                        operation = new(tree.Operation)(op, [operation || m, a], isSpaced);
+                        operation = new (tree.Operation)(op, [operation || m, a], isSpaced);
                         isSpaced = parserInput.isWhitespace(-1);
                     }
                     return operation || m;
@@ -2153,7 +2164,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (!b) {
                             break;
                         }
-                        condition = new(tree.Condition)('or', condition || a, b, index + currentIndex);
+                        condition = new (tree.Condition)('or', condition || a, b, index + currentIndex);
                     }
                     return condition || a;
                 }
@@ -2168,15 +2179,15 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 result = this.conditionAnd(needsParens);
                 if (!result) {
-                    return ;
+                    return;
                 }
                 logical = or();
                 if (logical) {
                     next = this.condition(needsParens);
                     if (next) {
-                        result = new(tree.Condition)(logical, result, next);
+                        result = new (tree.Condition)(logical, result, next);
                     } else {
-                        return ;
+                        return;
                     }
                 }
                 return result;
@@ -2199,15 +2210,15 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 result = insideCondition();
                 if (!result) {
-                    return ;
+                    return;
                 }
                 logical = and();
                 if (logical) {
                     next = this.conditionAnd(needsParens);
                     if (next) {
-                        result = new(tree.Condition)(logical, result, next);
+                        result = new (tree.Condition)(logical, result, next);
                     } else {
-                        return ;
+                        return;
                     }
                 }
                 return result;
@@ -2228,11 +2239,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     body = me.condition(needsParens);
                     if (!body) {
                         parserInput.restore();
-                        return ;
+                        return;
                     }
                     if (!parserInput.$char(')')) {
                         parserInput.restore();
-                        return ;
+                        return;
                     }
                     parserInput.forget();
                     return body;
@@ -2242,7 +2253,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 parserInput.save();
                 if (!parserInput.$str('(')) {
                     parserInput.restore();
-                    return ;
+                    return;
                 }
                 body = tryConditionFollowedByParenthesis(this);
                 if (body) {
@@ -2253,11 +2264,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 body = this.atomicCondition(needsParens);
                 if (!body) {
                     parserInput.restore();
-                    return ;
+                    return;
                 }
                 if (!parserInput.$char(')')) {
                     parserInput.restore(`expected ')' got '${parserInput.currentChar()}'`);
-                    return ;
+                    return;
                 }
                 parserInput.forget();
                 return body;
@@ -2270,7 +2281,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 let c;
                 let op;
 
-                const cond = (function() {
+                const cond = (function () {
                     return this.addition() || entities.keyword() || entities.quoted() || entities.mixinLookup();
                 }).bind(this)
 
@@ -2288,31 +2299,31 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                             op = '>';
                         }
                     } else
-                    if (parserInput.$char('<')) {
-                        if (parserInput.$char('=')) {
-                            op = '<=';
-                        } else {
-                            op = '<';
-                        }
-                    } else
-                    if (parserInput.$char('=')) {
-                        if (parserInput.$char('>')) {
-                            op = '=>';
-                        } else if (parserInput.$char('<')) {
-                            op = '=<';
-                        } else {
-                            op = '=';
-                        }
-                    }
+                        if (parserInput.$char('<')) {
+                            if (parserInput.$char('=')) {
+                                op = '<=';
+                            } else {
+                                op = '<';
+                            }
+                        } else
+                            if (parserInput.$char('=')) {
+                                if (parserInput.$char('>')) {
+                                    op = '=>';
+                                } else if (parserInput.$char('<')) {
+                                    op = '=<';
+                                } else {
+                                    op = '=';
+                                }
+                            }
                     if (op) {
                         b = cond();
                         if (b) {
-                            c = new(tree.Condition)(op, a, b, index + currentIndex, false);
+                            c = new (tree.Condition)(op, a, b, index + currentIndex, false);
                         } else {
                             error('expected expression');
                         }
-                    } else if (!preparsedCond) {
-                        c = new(tree.Condition)('=', a, new(tree.Keyword)('true'), index + currentIndex, false);
+                    } else {
+                        c = new (tree.Condition)('=', a, new (tree.Keyword)('true'), index + currentIndex, false);
                     }
                     return c;
                 }
@@ -2331,14 +2342,14 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 }
 
                 let o = this.sub() || entities.dimension() ||
-                        entities.color() || entities.variable() ||
-                        entities.property() || entities.call() ||
-                        entities.quoted(true) || entities.colorKeyword() ||
-                        entities.mixinLookup();
+                    entities.color() || entities.variable() ||
+                    entities.property() || entities.call() ||
+                    entities.quoted(true) || entities.colorKeyword() ||
+                    entities.mixinLookup();
 
                 if (negate) {
                     o.parensInOp = true;
-                    o = new(tree.Negative)(o);
+                    o = new (tree.Negative)(o);
                 }
 
                 return o;
@@ -2375,13 +2386,13 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         if (!parserInput.peek(/^\/[/*]/)) {
                             delim = parserInput.$char('/');
                             if (delim) {
-                                entities.push(new(tree.Anonymous)(delim, index + currentIndex));
+                                entities.push(new (tree.Anonymous)(delim, index + currentIndex));
                             }
                         }
                     }
                 } while (e);
                 if (entities.length > 0) {
-                    return new(tree.Expression)(entities);
+                    return new (tree.Expression)(entities);
                 }
             },
             property: function () {
@@ -2400,7 +2411,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 const simpleProperty = parserInput.$re(/^([_a-zA-Z0-9-]+)\s*:/);
                 if (simpleProperty) {
-                    name = [new(tree.Keyword)(simpleProperty[1])];
+                    name = [new (tree.Keyword)(simpleProperty[1])];
                     parserInput.forget();
                     return name;
                 }
@@ -2433,10 +2444,10 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     for (k = 0; k < name.length; k++) {
                         s = name[k];
                         name[k] = (s.charAt(0) !== '@' && s.charAt(0) !== '$') ?
-                            new(tree.Keyword)(s) :
+                            new (tree.Keyword)(s) :
                             (s.charAt(0) === '@' ?
-                                new(tree.Variable)(`@${s.slice(2, -1)}`, index[k] + currentIndex, fileInfo) :
-                                new(tree.Property)(`$${s.slice(2, -1)}`, index[k] + currentIndex, fileInfo));
+                                new (tree.Variable)(`@${s.slice(2, -1)}`, index[k] + currentIndex, fileInfo) :
+                                new (tree.Property)(`$${s.slice(2, -1)}`, index[k] + currentIndex, fileInfo));
                     }
                     return name;
                 }

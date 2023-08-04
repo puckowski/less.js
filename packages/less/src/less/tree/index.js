@@ -29,6 +29,7 @@ import QueryInParens from './query-in-parens';
 import Paren from './paren';
 import Media from './media';
 import Container from './container';
+import Scope from './scope';
 import UnicodeDescriptor from './unicode-descriptor';
 import Negative from './negative';
 import Extend from './extend';
@@ -45,9 +46,9 @@ export default {
     Ruleset, Element, Attribute, Combinator, Selector,
     Quoted, Expression, Declaration, Call, URL, Import,
     Comment, Anonymous, Value, JavaScript, Assignment,
-    Condition, Paren, Media, Container, QueryInParens, 
-    UnicodeDescriptor, Negative, Extend, VariableCall, 
-    NamespaceValue,
+    Condition, Paren, Media, Container, QueryInParens,
+    UnicodeDescriptor, Negative, Extend, VariableCall,
+    NamespaceValue, Scope,
     mixin: {
         Call: MixinCall,
         Definition: MixinDefinition
