@@ -8090,6 +8090,18 @@
             context.mediaPath.pop();
             return context.mediaPath.length === 0 ? media.evalTop(context) :
                 media.evalNested(context);
+        }, getNestedElementValue: function (pathNode) {
+            var tmp = pathNode.value.trim();
+            if (tmp.startsWith('(')) {
+                tmp = tmp.substring(1);
+            }
+            if (tmp.endsWith(')')) {
+                tmp = tmp.substring(0, tmp.length - 1);
+            }
+            if (tmp.startsWith(':scope')) {
+                tmp = tmp.substring(6).trim();
+            }
+            return tmp;
         }, evalNested: function (context) {
             var i, n;
             var value;
@@ -8104,21 +8116,12 @@
             for (i = 0; i < path.length; ++i) {
                 var buildTo = true;
                 for (n = 0; n < path[i].length; ++n) {
-                    for (var e_1 = 0; e_1 < path[i][n].elements.length; ++e_1) {
-                        if (path[i][n].elements[e_1].value === 'to') {
+                    for (var e = 0; e < path[i][n].elements.length; ++e) {
+                        if (path[i][n].elements[e].value === 'to') {
                             buildTo = false;
                         }
                         else if (buildTo) {
-                            tmp = path[i][n].elements[e_1].value.trim();
-                            if (tmp.startsWith('(')) {
-                                tmp = tmp.substring(1);
-                            }
-                            if (tmp.endsWith(')')) {
-                                tmp = tmp.substring(0, tmp.length - 1);
-                            }
-                            if (tmp.startsWith(':scope')) {
-                                tmp = tmp.substring(6).trim();
-                            }
+                            tmp = this.getNestedElementValue(path[i][n].elements[e]);
                             if (fromCss.length > 0 && !tmp.startsWith('>')) {
                                 fromCss += ' > ';
                             }
@@ -8128,16 +8131,7 @@
                             fromCss += tmp;
                         }
                         else {
-                            tmp = path[i][n].elements[e_1].value.trim();
-                            if (tmp.startsWith('(')) {
-                                tmp = tmp.substring(1);
-                            }
-                            if (tmp.endsWith(')')) {
-                                tmp = tmp.substring(0, tmp.length - 1);
-                            }
-                            if (tmp.startsWith(':scope')) {
-                                tmp = tmp.substring(6).trim();
-                            }
+                            tmp = this.getNestedElementValue(path[i][n].elements[e]);
                             if (toCss.length > 0 && !tmp.startsWith('>')) {
                                 toCss += ' > ';
                             }
@@ -8149,15 +8143,7 @@
                     }
                 }
             }
-            //path = [];
             path = new Value(new Expression([new Selector('(' + fromCss + ')'), new Anonymous(' to '), new Selector('(' + fromCss + ' > ' + toCss + ')')]));
-            // Trace all permutations to generate the resulting media-query.
-            //
-            // (a, b and c) with nested (d, e) ->
-            //    a and d
-            //    a and e
-            //    b and c and d
-            //    b and c and e
             this.features = path;
             this.setParent(this.features, this);
             // Fake a tree-node that doesn't output anything.

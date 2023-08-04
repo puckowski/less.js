@@ -73,8 +73,24 @@ Scope.prototype = Object.assign(new AtRule(), {
             media.evalNested(context);
     },
 
+    getNestedElementValue(pathNode) {
+        let tmp = pathNode.value.trim();
+
+        if (tmp.startsWith('(')) {
+            tmp = tmp.substring(1);
+        }
+        if (tmp.endsWith(')')) {
+            tmp = tmp.substring(0, tmp.length - 1);
+        }
+        if (tmp.startsWith(':scope')) {
+            tmp = tmp.substring(6).trim();
+        }
+
+        return tmp;
+    },
+
     evalNested(context) {
-        let i, n, e;
+        let i, n;
         let value;
         const path = context.mediaPath.concat([this]);
 
@@ -86,6 +102,7 @@ Scope.prototype = Object.assign(new AtRule(), {
         }
 
         let fromCss = '', toCss = '', tmp;
+
         for (i = 0; i < path.length; ++i) {
             let buildTo = true;
 
@@ -94,53 +111,32 @@ Scope.prototype = Object.assign(new AtRule(), {
                     if (path[i][n].elements[e].value === 'to') {
                         buildTo = false;
                     } else if (buildTo) {
-                        tmp = path[i][n].elements[e].value.trim();
-                        if (tmp.startsWith('(')) {
-                            tmp = tmp.substring(1);
-                        }
-                        if (tmp.endsWith(')')) {
-                            tmp = tmp.substring(0, tmp.length - 1);
-                        }
-                        if (tmp.startsWith(':scope')) {
-                            tmp = tmp.substring(6).trim();
-                        }
+                        tmp = this.getNestedElementValue(path[i][n].elements[e]);
+
                         if (fromCss.length > 0 && !tmp.startsWith('>')) {
                             fromCss += ' > ';
                         } else {
                             fromCss += ' ';
                         }
+
                         fromCss += tmp;
                     } else {
-                        tmp = path[i][n].elements[e].value.trim();
-                        if (tmp.startsWith('(')) {
-                            tmp = tmp.substring(1);
-                        }
-                        if (tmp.endsWith(')')) {
-                            tmp = tmp.substring(0, tmp.length - 1);
-                        }
-                        if (tmp.startsWith(':scope')) {
-                            tmp = tmp.substring(6).trim();
-                        }
+                        tmp = this.getNestedElementValue(path[i][n].elements[e]);
+
                         if (toCss.length > 0 && !tmp.startsWith('>')) {
                             toCss += ' > ';
                         } else {
                             toCss += ' ';
                         }
+
                         toCss += tmp;
                     }
                 }
             }
         }
-        //path = [];
+
         path = new Value(new Expression([new Selector('(' + fromCss + ')'), new Anonymous(' to '), new Selector('(' + fromCss + ' > ' + toCss + ')')]));
 
-        // Trace all permutations to generate the resulting media-query.
-        //
-        // (a, b and c) with nested (d, e) ->
-        //    a and d
-        //    a and e
-        //    b and c and d
-        //    b and c and e
         this.features = path;
         this.setParent(this.features, this);
 
