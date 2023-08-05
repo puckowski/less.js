@@ -1877,7 +1877,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                     }
                 }
-
+                
                 parserInput.restore();
             },
 
