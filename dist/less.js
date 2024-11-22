@@ -1380,7 +1380,7 @@
                 _hasIndexed = true;
             }
         }
-        Visitor.prototype.visit = function (node) {
+        Visitor.prototype.visit = function (node, syntaxOptions) {
             if (!node) {
                 return node;
             }
@@ -1396,6 +1396,13 @@
             var func = this._visitInCache[nodeTypeIndex];
             var funcOut = this._visitOutCache[nodeTypeIndex];
             var visitArgs = _visitArgs;
+            if (syntaxOptions) {
+                visitArgs = __assign(__assign({}, syntaxOptions), visitArgs);
+            }
+            else if (this._visitArgs) {
+                visitArgs = __assign(__assign({}, this._visitArgs), visitArgs);
+            }
+            this._visitArgs = visitArgs;
             var fnName;
             visitArgs.visitDeeper = true;
             if (!func) {
@@ -1428,7 +1435,7 @@
             }
             return node;
         };
-        Visitor.prototype.visitArray = function (nodes, nonReplacing) {
+        Visitor.prototype.visitArray = function (nodes, nonReplacing, syntaxOptions) {
             if (!nodes) {
                 return nodes;
             }
@@ -1437,7 +1444,7 @@
             // Non-replacing
             if (nonReplacing || !this._implementation.isReplacing) {
                 for (i = 0; i < cnt; i++) {
-                    this.visit(nodes[i]);
+                    this.visit(nodes[i], syntaxOptions);
                 }
                 return nodes;
             }
@@ -2349,7 +2356,7 @@
                     selectors = selectors.filter(function (selector) { return selector.getIsOutput(); });
                     rulesetNode.selectors = selectors.length ? selectors : (selectors = null);
                     if (selectors) {
-                        rulesetNode.joinSelectors(paths, context, selectors);
+                        rulesetNode.joinSelectors(paths, context, selectors, visitArgs);
                     }
                 }
                 if (!selectors) {
@@ -3236,6 +3243,10 @@
     };
     var ContainerSyntaxOptions = {
         queryInParens: true
+    };
+    var ScopeSyntaxOptions = {
+        queryInParens: true,
+        scopeAtRule: true
     };
 
     //
@@ -4902,7 +4913,14 @@
                                 parserInput.restore();
                                 e = this.value();
                             }
-                            if (parserInput.$char(')')) {
+                            if (syntaxOptions.scopeAtRule && !p && syntaxOptions.queryInParens) {
+                                parserInput.restore();
+                                p = this.selector();
+                                if (p) {
+                                    nodes.push(p);
+                                }
+                            }
+                            else if (parserInput.$char(')')) {
                                 if (p && !e) {
                                     nodes.push(new (tree.Paren)(new (tree.QueryInParens)(p.op, p.lvalue, p.rvalue, rangeP ? rangeP.op : null, rangeP ? rangeP.rvalue : null, p._index)));
                                     e = p;
@@ -4975,8 +4993,11 @@
                         if (parserInput.$str('@media')) {
                             return this.prepareAndGetNestableAtRule(tree.Media, index, debugInfo, MediaSyntaxOptions);
                         }
-                        if (parserInput.$str('@container')) {
+                        else if (parserInput.$str('@container')) {
                             return this.prepareAndGetNestableAtRule(tree.Container, index, debugInfo, ContainerSyntaxOptions);
+                        }
+                        else if (parserInput.$str('@scope')) {
+                            return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                         }
                     }
                     parserInput.restore();
@@ -6339,7 +6360,7 @@
                 }
                 var paths = this.paths;
                 var pathCnt = paths.length;
-                var pathSubCnt = void 0;
+                var pathSubCnt = void 0, appendedAmp = void 0;
                 sep = context.compress ? ',' : (",\n".concat(tabSetStr));
                 for (i = 0; i < pathCnt; i++) {
                     path = paths[i];
@@ -6350,10 +6371,20 @@
                         output.add(sep);
                     }
                     context.firstSelector = true;
-                    path[0].genCSS(context, output);
+                    if (!(pathSubCnt > 1 && path[0].elements.length === 1 && path[0].elements[0].value === '&')) {
+                        path[0].genCSS(context, output);
+                    }
+                    appendedAmp = true;
                     context.firstSelector = false;
                     for (j = 1; j < pathSubCnt; j++) {
+                        if (j === 0 && pathSubCnt > 1 && path[j].elements.length === 1 && path[j].elements[0].value === '&') {
+                            continue;
+                        }
+                        else if (path[j].elements[0].value === '&' && appendedAmp) {
+                            continue;
+                        }
                         path[j].genCSS(context, output);
+                        appendedAmp = true;
                     }
                 }
                 output.add((context.compress ? '{' : ' {\n') + tabRuleStr);
@@ -6389,12 +6420,12 @@
                 output.add('\n');
             }
         },
-        joinSelectors: function (paths, context, selectors) {
+        joinSelectors: function (paths, context, selectors, visitArgs) {
             for (var s = 0; s < selectors.length; s++) {
-                this.joinSelector(paths, context, selectors[s]);
+                this.joinSelector(paths, context, selectors[s], visitArgs);
             }
         },
-        joinSelector: function (paths, context, selector) {
+        joinSelector: function (paths, context, selector, visitArgs) {
             function createParenthesis(elementsToPak, originalElement) {
                 var replacementParen, j;
                 if (elementsToPak.length === 0) {
@@ -6549,6 +6580,9 @@
                         else {
                             currentElements.push(el);
                         }
+                    }
+                    else if (el.value === '&' && el.combinator.value === '' && visitArgs && visitArgs.preserve) {
+                        currentElements.push(new Element(el.value));
                     }
                     else {
                         hadParentSelector = true;
@@ -7647,6 +7681,7 @@
     };
     Media.prototype = Object.assign(new AtRule(), __assign(__assign({ type: 'Media' }, NestableAtRulePrototype), { genCSS: function (context, output) {
             output.add('@media ', this._fileInfo, this._index);
+            context.firstSelector = true;
             this.features.genCSS(context, output);
             this.outputRuleset(context, output, this.rules);
         }, eval: function (context) {
@@ -8044,6 +8079,114 @@
             context.mediaPath.pop();
             return context.mediaPath.length === 0 ? media.evalTop(context) :
                 media.evalNested(context);
+        } }));
+
+    var Scope = function (value, features, index, currentFileInfo, visibilityInfo) {
+        this._index = index;
+        this._fileInfo = currentFileInfo;
+        var selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
+        this.features = new Value(features);
+        this.rules = [new Ruleset(selectors, value)];
+        this.rules[0].allowImports = true;
+        this.copyVisibilityInfo(visibilityInfo);
+        this.allowRoot = true;
+        this.setParent(selectors, this);
+        this.setParent(this.features, this);
+        this.setParent(this.rules, this);
+    };
+    Scope.prototype = Object.assign(new AtRule(), __assign(__assign({ type: 'Scope' }, NestableAtRulePrototype), { accept: function (visitor) {
+            if (this.features) {
+                this.features = visitor.visit(this.features, { preserve: true });
+            }
+            if (this.rules) {
+                this.rules = visitor.visitArray(this.rules, undefined, { preserve: true });
+            }
+        }, genCSS: function (context, output) {
+            if (this.rules && (Array.isArray(this.rules) && this.rules.length > 0) || (Array.isArray(this.rules[0]) && this.rules[0].length > 0)) {
+                output.add('@scope', this._fileInfo, this._index);
+                context.firstSelector = true;
+                this.features.genCSS(context, output);
+                this.outputRuleset(context, output, this.rules);
+            }
+        }, eval: function (context) {
+            if (!context.mediaBlocks) {
+                context.mediaBlocks = [];
+                context.mediaPath = [];
+            }
+            var media = new Scope(null, [], this._index, this._fileInfo, this.visibilityInfo());
+            if (this.debugInfo) {
+                this.rules[0].debugInfo = this.debugInfo;
+                media.debugInfo = this.debugInfo;
+            }
+            media.features = this.features.eval(context);
+            context.mediaPath.push(media);
+            context.mediaBlocks.push(media);
+            this.rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+            context.frames.unshift(this.rules[0]);
+            media.rules = [this.rules[0].eval(context)];
+            context.frames.shift();
+            context.mediaPath.pop();
+            return context.mediaPath.length === 0 ? media.evalTop(context) :
+                media.evalNested(context);
+        }, getNestedElementValue: function (pathNode) {
+            var tmp = pathNode.value.trim();
+            if (tmp.startsWith('(')) {
+                tmp = tmp.substring(1);
+            }
+            if (tmp.endsWith(')')) {
+                tmp = tmp.substring(0, tmp.length - 1);
+            }
+            if (tmp.startsWith(':scope')) {
+                tmp = tmp.substring(6).trim();
+            }
+            return tmp;
+        }, evalNested: function (context) {
+            var i, n;
+            var value;
+            var path = context.mediaPath.concat([this]);
+            // Extract the media-query conditions separated with `,` (OR).
+            for (i = 0; i < path.length; i++) {
+                value = path[i].features instanceof Value ?
+                    path[i].features.value : path[i].features;
+                path[i] = Array.isArray(value) ? value : [value];
+            }
+            var fromCss = '', toCss = '', tmp;
+            for (i = 0; i < path.length; ++i) {
+                var buildTo = true;
+                for (n = 0; n < path[i].length; ++n) {
+                    for (var e = 0; e < path[i][n].elements.length; ++e) {
+                        if (path[i][n].elements[e].value === 'to') {
+                            buildTo = false;
+                        }
+                        else if (buildTo) {
+                            tmp = this.getNestedElementValue(path[i][n].elements[e]);
+                            if (fromCss.length > 0 && !tmp.startsWith('>')) {
+                                fromCss += ' > ';
+                            }
+                            else {
+                                fromCss += fromCss !== '' ? ' ' : '';
+                            }
+                            fromCss += tmp;
+                        }
+                        else {
+                            tmp = this.getNestedElementValue(path[i][n].elements[e]);
+                            if (toCss.length > 0 && !tmp.startsWith('>')) {
+                                toCss += ' > ';
+                            }
+                            toCss += tmp;
+                        }
+                    }
+                }
+            }
+            path = new Value(new Expression([
+                new Selector(' (' + fromCss + ')'),
+                new Anonymous('to'),
+                new Selector('(' + fromCss + ' > ' + toCss + ')')
+            ]));
+            this.features = path;
+            this.setParent(this.features, this);
+            // Fake a tree-node that doesn't output anything.
+            return new Ruleset([], []);
         } }));
 
     var UnicodeDescriptor = function (value) {
@@ -8650,6 +8793,7 @@
         Extend: Extend,
         VariableCall: VariableCall,
         NamespaceValue: NamespaceValue,
+        Scope: Scope,
         mixin: {
             Call: MixinCall,
             Definition: Definition
@@ -9710,8 +9854,11 @@
             if (!(current instanceof Dimension)) {
                 if (Array.isArray(args[i].value)) {
                     Array.prototype.push.apply(args, Array.prototype.slice.call(args[i].value));
+                    continue;
                 }
-                continue;
+                else {
+                    throw { type: 'Argument', message: 'incompatible types' };
+                }
             }
             currentUnified = current.unit.toString() === '' && unitClone !== undefined ? new Dimension(current.value, unitClone).unify() : current.unify();
             unit = currentUnified.unit.toString() === '' && unitStatic !== undefined ? unitStatic : currentUnified.unit.toString();

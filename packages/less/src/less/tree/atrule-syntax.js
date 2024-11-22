@@ -5,3 +5,8 @@ export const MediaSyntaxOptions = {
 export const ContainerSyntaxOptions = {
     queryInParens: true
 };
+
+export const ScopeSyntaxOptions = {
+    queryInParens: true,
+    scopeAtRule: true
+};
