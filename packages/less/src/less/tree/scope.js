@@ -38,9 +38,12 @@ Scope.prototype = Object.assign(new AtRule(), {
 
     genCSS(context, output) {
         if (this.rules && (Array.isArray(this.rules) && this.rules.length > 0) || (Array.isArray(this.rules[0]) && this.rules[0].length > 0)) {
-            output.add('@scope', this._fileInfo, this._index);
+            context.scopeRuleOffset = 0;
+            context.scopeAtRule = true;
+            output.add('@scope ', this._fileInfo, this._index);
             context.firstSelector = true;
             this.features.genCSS(context, output);
+            context.scopeRuleOffset = 0;
             this.outputRuleset(context, output, this.rules);
         }
     },

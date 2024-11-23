@@ -2,7 +2,7 @@
   & {
     /* Only match links inside a light-scheme */
   }
-   a {
+  a {
     color: darkmagenta;
   }
 }
@@ -10,7 +10,7 @@
   & {
     /* Only match links inside a dark-scheme */
   }
-   a {
+  a {
     color: plum;
   }
 }
@@ -18,7 +18,7 @@
   & {
     /* Only match author images inside a media-object */
   }
-   .author-image {
+  .author-image {
     border-radius: 50%;
   }
 }
@@ -26,10 +26,10 @@
   & {
     /* only the outer section is part of the outer scope */
   }
-   p {
+  p {
     color: red;
   }
-   section {
+  section {
     background: snow;
   }
 }
@@ -37,10 +37,10 @@
   & {
     /* the inner section is only part of the inner scope */
   }
-   p {
+  p {
     color: blue;
   }
-   section {
+  section {
     color: ghostwhite;
   }
 }
@@ -48,10 +48,10 @@
   & {
     border: thin solid;
   }
-   :scope {
+  :scope {
     border: thin solid;
   }
-   main :scope p {
+  main :scope p {
     color: green;
   }
   main & p {
@@ -60,7 +60,7 @@
 }
 
 @scope (.parent-scope > .child-scope) to (.parent-scope > .child-scope > .limit) {
-   :scope .content {
+  :scope .content {
     color: red;
   }
 }
