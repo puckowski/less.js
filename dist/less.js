@@ -890,6 +890,10 @@
         type: 'Combinator',
         genCSS: function (context, output) {
             var spaceOrEmpty = (context.compress || _noSpaceCombinators[this.value]) ? '' : ' ';
+            if (context.scopeAtRule && context.scopeRuleOffset === 0 && this.value === ' ') {
+                this.value = '';
+            }
+            context.scopeRuleOffset++;
             output.add(spaceOrEmpty + this.value + spaceOrEmpty);
         }
     });
@@ -6416,6 +6420,7 @@
                 output.add((context.compress ? '}' : "\n".concat(tabSetStr, "}")));
                 context.tabLevel--;
             }
+            context.scopeRuleOffset = 0;
             if (!output.isEmpty() && !context.compress && this.firstRoot) {
                 output.add('\n');
             }
@@ -8103,9 +8108,12 @@
             }
         }, genCSS: function (context, output) {
             if (this.rules && (Array.isArray(this.rules) && this.rules.length > 0) || (Array.isArray(this.rules[0]) && this.rules[0].length > 0)) {
-                output.add('@scope', this._fileInfo, this._index);
+                context.scopeRuleOffset = 0;
+                context.scopeAtRule = true;
+                output.add('@scope ', this._fileInfo, this._index);
                 context.firstSelector = true;
                 this.features.genCSS(context, output);
+                context.scopeRuleOffset = 0;
                 this.outputRuleset(context, output, this.rules);
             }
         }, eval: function (context) {

@@ -20,6 +20,10 @@ Combinator.prototype = Object.assign(new Node(), {
 
     genCSS(context, output) {
         const spaceOrEmpty = (context.compress || _noSpaceCombinators[this.value]) ? '' : ' ';
+        if (context.scopeAtRule && context.scopeRuleOffset ===0 && this.value === ' ') {
+            this.value = '';
+        }
+        context.scopeRuleOffset++;
         output.add(spaceOrEmpty + this.value + spaceOrEmpty);
     }
 });
