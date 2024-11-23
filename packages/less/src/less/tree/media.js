@@ -27,6 +27,7 @@ Media.prototype = Object.assign(new AtRule(), {
 
     genCSS(context, output) {
         output.add('@media ', this._fileInfo, this._index);
+        context.firstSelector = true;
         this.features.genCSS(context, output);
         this.outputRuleset(context, output, this.rules);
     },
