@@ -1909,6 +1909,17 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     else if (parserInput.$str('@scope')) {
                         return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                     }
+                    else if (parserInput.$str('@starting-style')) {
+                        var rules = this.block();
+                        if (!rules) {
+                            error('media definitions require block statements after any features');
+                        }
+                        var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
+                        if (context.dumpLineNumbers) {
+                            atRule.debugInfo = debugInfo;
+                        }
+                        return atRule;  
+                    }
                 }
                 
                 parserInput.restore();
