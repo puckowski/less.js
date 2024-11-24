@@ -4,20 +4,32 @@ import AtRule from './atrule';
 import NestableAtRulePrototype from './nested-at-rule';
 import Anonymous from './anonymous';
 import Expression from './expression';
+import Ruleset from './ruleset';
 
 const StartingStyle = function(value, features, index, currentFileInfo, visibilityInfo) {
     this._index = index;
     this._fileInfo = currentFileInfo;
+    var selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
+    this.simpleBlock = features && features[0] instanceof Expression === false;
+    if (this.simpleBlock) {
+        this.features = new Value(features);
+        this.declarations = value;
+        this.allowRoot = true;
+        this.setParent(selectors, this);
+        this.setParent(this.features, this);
+        this.setParent(this.declarations, this);
+    } else {
+        this.features = new Value([]);
+        this.rules = [new Ruleset(selectors, value)];//value;
+        this.rules[0].allowImports = true;
+        this.allowRoot = true;
+        this.setParent(selectors, this);
+        this.setParent(this.features, this);
+        this.setParent(this.rules, this);
+    }
 
-    const selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
-
-    this.features = new Value(features);
-    this.declarations = value;
     this.copyVisibilityInfo(visibilityInfo);
-    this.allowRoot = true;
-    this.setParent(selectors, this);
-    this.setParent(this.features, this);
-    this.setParent(this.declarations, this);
+
 };
 
 StartingStyle.prototype = Object.assign(new AtRule(), {
@@ -29,7 +41,11 @@ StartingStyle.prototype = Object.assign(new AtRule(), {
         output.add('@starting-style', this._fileInfo, this._index);
         context.firstSelector = true;
         this.features.genCSS(context, output);
-        this.outputRuleset(context, output, this.declarations);
+        if (this.simpleBlock) {
+            this.outputRuleset(context, output, this.declarations);
+        } else {
+            this.outputRuleset(context, output, this.rules);  
+        }
     },
 
     eval(context) {
@@ -37,25 +53,43 @@ StartingStyle.prototype = Object.assign(new AtRule(), {
             context.mediaBlocks = [];
             context.mediaPath = [];
         }
-
         const media = new StartingStyle(null, [], this._index, this._fileInfo, this.visibilityInfo());
-        if (this.debugInfo) {
-            this.declarations[0].debugInfo = this.debugInfo;
-            media.debugInfo = this.debugInfo;
-        }
         
-        media.features = this.features.eval(context);
+        if (this.simpleBlock) {
+            if (this.debugInfo) {
+                this.declarations[0].debugInfo = this.debugInfo;
+                media.debugInfo = this.debugInfo;
+            }
+            
+            media.features = this.features.eval(context);
 
-        this.declarations[0].functionRegistry = context.frames[0].functionRegistry.inherit();
-        context.frames.unshift(this.declarations[0]);
-        media.declarations = this.declarations.map(rule => rule.eval(context));
-        context.frames.shift();
+            this.declarations[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+            context.frames.unshift(this.declarations[0]);
+            media.declarations = this.declarations.map(rule => rule.eval(context));
+            context.frames.shift();
 
-        return context.mediaPath.length == 0 ? media.evalTop(context) :
-            media.evalNested(context);
+            return context.mediaPath.length == 0 ? media.evalTop(context) :
+                media.evalNestedBlock(context);
+        } else {
+            media.simpleBlock = false;
+            if (this.debugInfo) {
+                this.rules[0].debugInfo = this.debugInfo;
+                media.debugInfo = this.debugInfo;
+            }
+            media.features = this.features.eval(context);
+            context.mediaPath.push(media);
+            context.mediaBlocks.push(media);
+            this.rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+            context.frames.unshift(this.rules[0]);
+            media.rules = [this.rules[0].eval(context)];
+            context.frames.shift();
+            context.mediaPath.pop();
+            return context.mediaPath.length === 0 ? media.evalTop(context) :
+                media.evalNested(context);
+        }
     },
 
-    evalNested: function (context) {
+    evalNestedBlock: function (context) {
         var i;
         var value;
         var path = context.mediaPath.concat([this]);

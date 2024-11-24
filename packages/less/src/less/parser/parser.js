@@ -1910,15 +1910,25 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                         return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                     }
                     else if (parserInput.$str('@starting-style')) {
-                        var rules = this.block();
-                        if (!rules) {
-                            error('media definitions require block statements after any features');
+                        var rules = [];
+                        if (parserInput.$re(/.*{/)) {
+                            let e;
+                            while (e = this.declaration()) {
+                                rules.push(e);
+                            }
                         }
-                        var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
-                        if (context.dumpLineNumbers) {
-                            atRule.debugInfo = debugInfo;
+                        if (rules.length === 0) {
+                            parserInput.restore();
+                            return this.prepareAndGetNestableAtRule(tree.StartingStyle, index, debugInfo, MediaSyntaxOptions);
+                        } else if (parserInput.$char('}')) {
+                            var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
+                            if (context.dumpLineNumbers) {
+                                atRule.debugInfo = debugInfo;
+                            }
+                            return atRule;  
+                        } else {
+                            error('starting-style definitions require declarations or rulesets after declaration');
                         }
-                        return atRule;  
                     }
                 }
                 
