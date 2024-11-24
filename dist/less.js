@@ -1863,7 +1863,13 @@
         },
         visitMediaOut: function (mediaNode) {
             this.context.frames.shift();
-        }
+        },
+        visitStartingStyle: function (mediaNode, visitArgs) {
+            this.context.frames.unshift(mediaNode.declarations ? mediaNode.declarations[0] : mediaNode.rules[0]);
+        },
+        visitStartingStyleOut: function (mediaNode) {
+            this.context.frames.shift();
+        },
     };
 
     var SetTreeVisibilityVisitor = /** @class */ (function () {
@@ -2380,6 +2386,15 @@
             var context = this.contexts[this.contexts.length - 1];
             if (atRuleNode.rules && atRuleNode.rules.length) {
                 atRuleNode.rules[0].root = (atRuleNode.isRooted || context.length === 0 || null);
+            }
+        };
+        JoinSelectorVisitor.prototype.visitStartingStyle = function (mediaNode, visitArgs) {
+            var context = this.contexts[this.contexts.length - 1];
+            if (mediaNode.declarations) {
+                mediaNode.declarations[0].root = (context.length === 0 || context[0].multiMedia);
+            }
+            else {
+                mediaNode.rules[0].root = (context.length === 0 || context[0].multiMedia);
             }
         };
         return JoinSelectorVisitor;
@@ -5004,15 +5019,27 @@
                             return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                         }
                         else if (parserInput.$str('@starting-style')) {
-                            var rules = this.block();
-                            if (!rules) {
-                                error('media definitions require block statements after any features');
+                            var rules = [];
+                            if (parserInput.$re(/.*{/)) {
+                                var e = void 0;
+                                while (e = this.declaration()) {
+                                    rules.push(e);
+                                }
                             }
-                            var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
-                            if (context.dumpLineNumbers) {
-                                atRule.debugInfo = debugInfo;
+                            if (rules.length === 0) {
+                                parserInput.restore();
+                                return this.prepareAndGetNestableAtRule(tree.StartingStyle, index, debugInfo, MediaSyntaxOptions);
                             }
-                            return atRule;
+                            else if (parserInput.$char('}')) {
+                                var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
+                                if (context.dumpLineNumbers) {
+                                    atRule.debugInfo = debugInfo;
+                                }
+                                return atRule;
+                            }
+                            else {
+                                error('starting-style definitions require declarations or rulesets after declaration');
+                            }
                         }
                     }
                     parserInput.restore();
@@ -5740,7 +5767,7 @@
     Keyword.True = new Keyword('true');
     Keyword.False = new Keyword('false');
 
-    var Anonymous$1 = function (value, index, currentFileInfo, mapLines, rulesetLike, visibilityInfo) {
+    var Anonymous = function (value, index, currentFileInfo, mapLines, rulesetLike, visibilityInfo) {
         this.value = value;
         this._index = index;
         this._fileInfo = currentFileInfo;
@@ -5749,10 +5776,10 @@
         this.allowRoot = true;
         this.copyVisibilityInfo(visibilityInfo);
     };
-    Anonymous$1.prototype = Object.assign(new Node(), {
+    Anonymous.prototype = Object.assign(new Node(), {
         type: 'Anonymous',
         eval: function () {
-            return new Anonymous$1(this.value, this._index, this._fileInfo, this.mapLines, this.rulesetLike, this.visibilityInfo());
+            return new Anonymous(this.value, this._index, this._fileInfo, this.mapLines, this.rulesetLike, this.visibilityInfo());
         },
         compare: function (other) {
             return other.toCSS && this.toCSS() === other.toCSS() ? 0 : undefined;
@@ -5781,7 +5808,7 @@
     }
     var Declaration = function (name, value, important, merge, index, currentFileInfo, inline, variable) {
         this.name = name;
-        this.value = (value instanceof Node) ? value : new Value([value ? new Anonymous$1(value) : null]);
+        this.value = (value instanceof Node) ? value : new Value([value ? new Anonymous(value) : null]);
         this.important = important ? " ".concat(important.trim()) : '';
         this.merge = merge;
         this._index = index;
@@ -6234,7 +6261,7 @@
         parseValue: function (toParse) {
             var self = this;
             function transformDeclaration(decl) {
-                if (decl.value instanceof Anonymous$1 && !decl.parsed) {
+                if (decl.value instanceof Anonymous && !decl.parsed) {
                     if (typeof decl.value.value === 'string') {
                         new Parser(this.parse.context, this.parse.importManager, decl.fileInfo(), decl.value.getIndex()).parseNode(decl.value.value, ['value', 'important'], function (err, result) {
                             if (err) {
@@ -6680,7 +6707,7 @@
     var AtRule = function (name, value, rules, index, currentFileInfo, debugInfo, isRooted, visibilityInfo) {
         var i;
         this.name = name;
-        this.value = (value instanceof Node) ? value : (value ? new Anonymous$1(value) : value);
+        this.value = (value instanceof Node) ? value : (value ? new Anonymous(value) : value);
         if (rules) {
             if (Array.isArray(rules)) {
                 this.rules = rules;
@@ -7136,14 +7163,14 @@
         }
     });
 
-    var Expression$1 = function (value, noSpacing) {
+    var Expression = function (value, noSpacing) {
         this.value = value;
         this.noSpacing = noSpacing;
         if (!value) {
             throw new Error('Expression requires an array parameter');
         }
     };
-    Expression$1.prototype = Object.assign(new Node(), {
+    Expression.prototype = Object.assign(new Node(), {
         type: 'Expression',
         accept: function (visitor) {
             this.value = visitor.visitArray(this.value);
@@ -7157,7 +7184,7 @@
                 context.inParenthesis();
             }
             if (this.value.length > 1) {
-                returnValue = new Expression$1(this.value.map(function (e) {
+                returnValue = new Expression(this.value.map(function (e) {
                     if (!e.eval) {
                         return e;
                     }
@@ -7186,8 +7213,8 @@
             for (var i_1 = 0; i_1 < this.value.length; i_1++) {
                 this.value[i_1].genCSS(context, output);
                 if (!this.noSpacing && i_1 + 1 < this.value.length) {
-                    if (i_1 + 1 < this.value.length && !(this.value[i_1 + 1] instanceof Anonymous$1) ||
-                        this.value[i_1 + 1] instanceof Anonymous$1 && this.value[i_1 + 1].value !== ',') {
+                    if (i_1 + 1 < this.value.length && !(this.value[i_1 + 1] instanceof Anonymous) ||
+                        this.value[i_1 + 1] instanceof Anonymous && this.value[i_1 + 1].value !== ',') {
                         output.add(' ');
                     }
                 }
@@ -7236,7 +7263,7 @@
                         return subNodes[0];
                     }
                     else {
-                        return new Expression$1(subNodes);
+                        return new Expression(subNodes);
                     }
                 }
                 return item;
@@ -7320,10 +7347,10 @@
                 // Falsy values or booleans are returned as empty nodes
                 if (!(result instanceof Node)) {
                     if (!result || result === true) {
-                        result = new Anonymous$1(null);
+                        result = new Anonymous(null);
                     }
                     else {
-                        result = new Anonymous$1(result.toString());
+                        result = new Anonymous(result.toString());
                     }
                 }
                 result._index = this._index;
@@ -7645,11 +7672,11 @@
             //    b and c and d
             //    b and c and e
             this.features = new Value(this.permute(path).map(function (path) {
-                path = path.map(function (fragment) { return fragment.toCSS ? fragment : new Anonymous$1(fragment); });
+                path = path.map(function (fragment) { return fragment.toCSS ? fragment : new Anonymous(fragment); });
                 for (i = path.length - 1; i > 0; i--) {
-                    path.splice(i, 0, new Anonymous$1('and'));
+                    path.splice(i, 0, new Anonymous('and'));
                 }
-                return new Expression$1(path);
+                return new Expression(path);
             }));
             this.setParent(this.features, this);
             // Fake a tree-node that doesn't output anything.
@@ -7857,7 +7884,7 @@
                 }
             }
             if (this.options.inline) {
-                var contents = new Anonymous$1(this.root, 0, {
+                var contents = new Anonymous(this.root, 0, {
                     filename: this.importedFilename,
                     reference: this.path._fileInfo && this.path._fileInfo.reference
                 }, true, true);
@@ -7953,10 +7980,10 @@
                 return new Quoted("\"".concat(result, "\""), result, this.escaped, this._index);
             }
             else if (Array.isArray(result)) {
-                return new Anonymous$1(result.join(', '));
+                return new Anonymous(result.join(', '));
             }
             else {
-                return new Anonymous$1(result);
+                return new Anonymous(result);
             }
         }
     });
@@ -8197,9 +8224,9 @@
                     }
                 }
             }
-            path = new Value(new Expression$1([
+            path = new Value(new Expression([
                 new Selector(' (' + fromCss + ')'),
-                new Anonymous$1('to'),
+                new Anonymous('to'),
                 new Selector('(' + fromCss + ' > ' + toCss + ')')
             ]));
             this.features = path;
@@ -8212,37 +8239,73 @@
         this._index = index;
         this._fileInfo = currentFileInfo;
         var selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
-        this.features = new Value(features);
-        this.declarations = value;
+        this.simpleBlock = features && features[0] instanceof Expression === false;
+        if (this.simpleBlock) {
+            this.features = new Value(features);
+            this.declarations = value;
+            this.allowRoot = true;
+            this.setParent(selectors, this);
+            this.setParent(this.features, this);
+            this.setParent(this.declarations, this);
+        }
+        else {
+            this.features = new Value([]);
+            this.rules = [new Ruleset(selectors, value)]; //value;
+            this.rules[0].allowImports = true;
+            this.allowRoot = true;
+            this.setParent(selectors, this);
+            this.setParent(this.features, this);
+            this.setParent(this.rules, this);
+        }
         this.copyVisibilityInfo(visibilityInfo);
-        this.allowRoot = true;
-        this.setParent(selectors, this);
-        this.setParent(this.features, this);
-        this.setParent(this.declarations, this);
     };
     StartingStyle.prototype = Object.assign(new AtRule(), __assign(__assign({ type: 'StartingStyle' }, NestableAtRulePrototype), { genCSS: function (context, output) {
             output.add('@starting-style', this._fileInfo, this._index);
             context.firstSelector = true;
             this.features.genCSS(context, output);
-            this.outputRuleset(context, output, this.declarations);
+            if (this.simpleBlock) {
+                this.outputRuleset(context, output, this.declarations);
+            }
+            else {
+                this.outputRuleset(context, output, this.rules);
+            }
         }, eval: function (context) {
             if (!context.mediaBlocks) {
                 context.mediaBlocks = [];
                 context.mediaPath = [];
             }
             var media = new StartingStyle(null, [], this._index, this._fileInfo, this.visibilityInfo());
-            if (this.debugInfo) {
-                this.declarations[0].debugInfo = this.debugInfo;
-                media.debugInfo = this.debugInfo;
+            if (this.simpleBlock) {
+                if (this.debugInfo) {
+                    this.declarations[0].debugInfo = this.debugInfo;
+                    media.debugInfo = this.debugInfo;
+                }
+                media.features = this.features.eval(context);
+                this.declarations[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+                context.frames.unshift(this.declarations[0]);
+                media.declarations = this.declarations.map(function (rule) { return rule.eval(context); });
+                context.frames.shift();
+                return context.mediaPath.length == 0 ? media.evalTop(context) :
+                    media.evalNestedBlock(context);
             }
-            media.features = this.features.eval(context);
-            this.declarations[0].functionRegistry = context.frames[0].functionRegistry.inherit();
-            context.frames.unshift(this.declarations[0]);
-            media.declarations = this.declarations.map(function (rule) { return rule.eval(context); });
-            context.frames.shift();
-            return context.mediaPath.length == 0 ? media.evalTop(context) :
-                media.evalNested(context);
-        }, evalNested: function (context) {
+            else {
+                media.simpleBlock = false;
+                if (this.debugInfo) {
+                    this.rules[0].debugInfo = this.debugInfo;
+                    media.debugInfo = this.debugInfo;
+                }
+                media.features = this.features.eval(context);
+                context.mediaPath.push(media);
+                context.mediaBlocks.push(media);
+                this.rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+                context.frames.unshift(this.rules[0]);
+                media.rules = [this.rules[0].eval(context)];
+                context.frames.shift();
+                context.mediaPath.pop();
+                return context.mediaPath.length === 0 ? media.evalTop(context) :
+                    media.evalNested(context);
+            }
+        }, evalNestedBlock: function (context) {
             var i;
             var value;
             var path = context.mediaPath.concat([this]);
@@ -8540,7 +8603,7 @@
                         for (j = argIndex; j < argsLength; j++) {
                             varargs.push(args[j].value.eval(context));
                         }
-                        frame.prependRule(new Declaration(name, new Expression$1(varargs).eval(context)));
+                        frame.prependRule(new Declaration(name, new Expression(varargs).eval(context)));
                     }
                     else {
                         val = arg && arg.value;
@@ -8594,7 +8657,7 @@
             var frame = this.evalParams(context, new contexts.Eval(context, mixinFrames), args, _arguments);
             var rules;
             var ruleset;
-            frame.prependRule(new Declaration('@arguments', new Expression$1(_arguments).eval(context)));
+            frame.prependRule(new Declaration('@arguments', new Expression(_arguments).eval(context)));
             rules = copyArray(this.rules);
             ruleset = new Ruleset(null, rules);
             ruleset.originalRuleset = this;
@@ -8855,13 +8918,13 @@
         Combinator: Combinator,
         Selector: Selector,
         Quoted: Quoted,
-        Expression: Expression$1,
+        Expression: Expression,
         Declaration: Declaration,
         Call: Call,
         URL: URL,
         Import: Import,
         Comment: Comment,
-        Anonymous: Anonymous$1,
+        Anonymous: Anonymous,
         Value: Value,
         JavaScript: JavaScript,
         Assignment: Assignment,
@@ -9173,7 +9236,7 @@
      */
     function If(context, condition, trueValue, falseValue) {
         return condition.eval(context) ? trueValue.eval(context)
-            : (falseValue ? falseValue.eval(context) : new Anonymous$1);
+            : (falseValue ? falseValue.eval(context) : new Anonymous);
     }
     If.evalArgs = false;
     function isdefined(context, variable) {
@@ -9250,7 +9313,7 @@
              * Comma-less syntax
              *   e.g. rgb(0 128 255 / 50%)
              */
-            if (r instanceof Expression$1) {
+            if (r instanceof Expression) {
                 var val = r.value;
                 r = val[0];
                 g = val[1];
@@ -9290,7 +9353,7 @@
         },
         hsl: function (h, s, l) {
             var a = 1;
-            if (h instanceof Expression$1) {
+            if (h instanceof Expression) {
                 var val = h.value;
                 h = val[0];
                 s = val[1];
@@ -9589,7 +9652,7 @@
         //     }
         // },
         argb: function (color) {
-            return new Anonymous$1(color.toARGB());
+            return new Anonymous(color.toARGB());
         },
         color: function (c) {
             if ((c instanceof Quoted) &&
@@ -9801,7 +9864,7 @@
             for (var i_1 = from; i_1 <= to.value; i_1 += stepValue) {
                 list.push(new Dimension(i_1, to.unit));
             }
-            return new Expression$1(list);
+            return new Expression(list);
         },
         each: function (list, rs) {
             var _this = this;
@@ -9966,7 +10029,7 @@
             return order[0];
         }
         args = order.map(function (a) { return a.toCSS(_this.context); }).join(this.context.compress ? ',' : ', ');
-        return new Anonymous$1("".concat(isMin ? 'min' : 'max', "(").concat(args, ")"));
+        return new Anonymous("".concat(isMin ? 'min' : 'max', "(").concat(args, ")"));
     };
     var number = {
         min: function () {
@@ -10019,7 +10082,7 @@
             return new Quoted('"', str instanceof JavaScript ? str.evaluated : str.value, true);
         },
         escape: function (str) {
-            return new Anonymous$1(encodeURI(str.value).replace(/=/g, '%3D').replace(/:/g, '%3A').replace(/#/g, '%23').replace(/;/g, '%3B')
+            return new Anonymous(encodeURI(str.value).replace(/=/g, '%3D').replace(/:/g, '%3A').replace(/#/g, '%23').replace(/;/g, '%3B')
                 .replace(/\(/g, '%28').replace(/\)/g, '%29'));
         },
         replace: function (string, pattern, replacement, flags) {
@@ -10104,7 +10167,7 @@
                 }
                 returner = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"><".concat(gradientType, "Gradient id=\"g\" ").concat(gradientDirectionSvg, ">");
                 for (i = 0; i < stops.length; i += 1) {
-                    if (stops[i] instanceof Expression$1) {
+                    if (stops[i] instanceof Expression) {
                         color = stops[i].value[0];
                         position = stops[i].value[1];
                     }
@@ -10185,7 +10248,7 @@
             return new Dimension(val.value, unit);
         },
         'get-unit': function (n) {
-            return new Anonymous$1(n.unit);
+            return new Anonymous(n.unit);
         }
     };
 
