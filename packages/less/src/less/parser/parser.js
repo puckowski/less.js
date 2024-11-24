@@ -1909,6 +1909,27 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     else if (parserInput.$str('@scope')) {
                         return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
                     }
+                    else if (parserInput.$str('@starting-style')) {
+                        var rules = [];
+                        if (parserInput.$re(/.*{/)) {
+                            let e;
+                            while (e = this.declaration()) {
+                                rules.push(e);
+                            }
+                        }
+                        if (rules.length === 0) {
+                            parserInput.restore();
+                            return this.prepareAndGetNestableAtRule(tree.StartingStyle, index, debugInfo, MediaSyntaxOptions);
+                        } else if (parserInput.$char('}')) {
+                            var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
+                            if (context.dumpLineNumbers) {
+                                atRule.debugInfo = debugInfo;
+                            }
+                            return atRule;  
+                        } else {
+                            error('starting-style definitions require declarations or rulesets after declaration');
+                        }
+                    }
                 }
                 
                 parserInput.restore();

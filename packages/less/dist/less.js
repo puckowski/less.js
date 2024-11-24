@@ -1863,7 +1863,13 @@
         },
         visitMediaOut: function (mediaNode) {
             this.context.frames.shift();
-        }
+        },
+        visitStartingStyle: function (mediaNode, visitArgs) {
+            this.context.frames.unshift(mediaNode.declarations ? mediaNode.declarations[0] : mediaNode.rules[0]);
+        },
+        visitStartingStyleOut: function (mediaNode) {
+            this.context.frames.shift();
+        },
     };
 
     var SetTreeVisibilityVisitor = /** @class */ (function () {
@@ -2380,6 +2386,15 @@
             var context = this.contexts[this.contexts.length - 1];
             if (atRuleNode.rules && atRuleNode.rules.length) {
                 atRuleNode.rules[0].root = (atRuleNode.isRooted || context.length === 0 || null);
+            }
+        };
+        JoinSelectorVisitor.prototype.visitStartingStyle = function (mediaNode, visitArgs) {
+            var context = this.contexts[this.contexts.length - 1];
+            if (mediaNode.declarations) {
+                mediaNode.declarations[0].root = (context.length === 0 || context[0].multiMedia);
+            }
+            else {
+                mediaNode.rules[0].root = (context.length === 0 || context[0].multiMedia);
             }
         };
         return JoinSelectorVisitor;
@@ -5002,6 +5017,29 @@
                         }
                         else if (parserInput.$str('@scope')) {
                             return this.prepareAndGetNestableAtRule(tree.Scope, index, debugInfo, ScopeSyntaxOptions);
+                        }
+                        else if (parserInput.$str('@starting-style')) {
+                            var rules = [];
+                            if (parserInput.$re(/.*{/)) {
+                                var e = void 0;
+                                while (e = this.declaration()) {
+                                    rules.push(e);
+                                }
+                            }
+                            if (rules.length === 0) {
+                                parserInput.restore();
+                                return this.prepareAndGetNestableAtRule(tree.StartingStyle, index, debugInfo, MediaSyntaxOptions);
+                            }
+                            else if (parserInput.$char('}')) {
+                                var atRule = new (tree.StartingStyle)(rules, [], index + currentIndex, fileInfo);
+                                if (context.dumpLineNumbers) {
+                                    atRule.debugInfo = debugInfo;
+                                }
+                                return atRule;
+                            }
+                            else {
+                                error('starting-style definitions require declarations or rulesets after declaration');
+                            }
                         }
                     }
                     parserInput.restore();
@@ -8197,6 +8235,105 @@
             return new Ruleset([], []);
         } }));
 
+    var StartingStyle = function (value, features, index, currentFileInfo, visibilityInfo) {
+        this._index = index;
+        this._fileInfo = currentFileInfo;
+        var selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
+        this.simpleBlock = features && features[0] instanceof Expression === false;
+        if (this.simpleBlock) {
+            this.features = new Value(features);
+            this.declarations = value;
+            this.allowRoot = true;
+            this.setParent(selectors, this);
+            this.setParent(this.features, this);
+            this.setParent(this.declarations, this);
+        }
+        else {
+            this.features = new Value([]);
+            this.rules = [new Ruleset(selectors, value)]; //value;
+            this.rules[0].allowImports = true;
+            this.allowRoot = true;
+            this.setParent(selectors, this);
+            this.setParent(this.features, this);
+            this.setParent(this.rules, this);
+        }
+        this.copyVisibilityInfo(visibilityInfo);
+    };
+    StartingStyle.prototype = Object.assign(new AtRule(), __assign(__assign({ type: 'StartingStyle' }, NestableAtRulePrototype), { genCSS: function (context, output) {
+            output.add('@starting-style', this._fileInfo, this._index);
+            context.firstSelector = true;
+            this.features.genCSS(context, output);
+            if (this.simpleBlock) {
+                this.outputRuleset(context, output, this.declarations);
+            }
+            else {
+                this.outputRuleset(context, output, this.rules);
+            }
+        }, eval: function (context) {
+            if (!context.mediaBlocks) {
+                context.mediaBlocks = [];
+                context.mediaPath = [];
+            }
+            var media = new StartingStyle(null, [], this._index, this._fileInfo, this.visibilityInfo());
+            if (this.simpleBlock) {
+                if (this.debugInfo) {
+                    this.declarations[0].debugInfo = this.debugInfo;
+                    media.debugInfo = this.debugInfo;
+                }
+                media.features = this.features.eval(context);
+                this.declarations[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+                context.frames.unshift(this.declarations[0]);
+                media.declarations = this.declarations.map(function (rule) { return rule.eval(context); });
+                context.frames.shift();
+                return context.mediaPath.length == 0 ? media.evalTop(context) :
+                    media.evalNestedBlock(context);
+            }
+            else {
+                media.simpleBlock = false;
+                if (this.debugInfo) {
+                    this.rules[0].debugInfo = this.debugInfo;
+                    media.debugInfo = this.debugInfo;
+                }
+                media.features = this.features.eval(context);
+                context.mediaPath.push(media);
+                context.mediaBlocks.push(media);
+                this.rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+                context.frames.unshift(this.rules[0]);
+                media.rules = [this.rules[0].eval(context)];
+                context.frames.shift();
+                context.mediaPath.pop();
+                return context.mediaPath.length === 0 ? media.evalTop(context) :
+                    media.evalNested(context);
+            }
+        }, evalNestedBlock: function (context) {
+            var i;
+            var value;
+            var path = context.mediaPath.concat([this]);
+            // Extract the media-query conditions separated with `,` (OR).
+            for (i = 0; i < path.length; i++) {
+                value = path[i].features instanceof Value ?
+                    path[i].features.value : path[i].features;
+                path[i] = Array.isArray(value) ? value : [value];
+            }
+            // Trace all permutations to generate the resulting media-query.
+            //
+            // (a, b and c) with nested (d, e) ->
+            //    a and d
+            //    a and e
+            //    b and c and d
+            //    b and c and e
+            this.features = new Value(this.permute(path).map(function (path) {
+                path = path.map(function (fragment) { return fragment.toCSS ? fragment : new Anonymous(fragment); });
+                for (i = path.length - 1; i > 0; i--) {
+                    path.splice(i, 0, new Anonymous('and'));
+                }
+                return new Expression(path);
+            }));
+            this.setParent(this.features, this);
+            // Fake a tree-node that doesn't output anything.
+            return new StartingStyle(this.declarations, this.features, this._index, this._fileInfo, this.visibilityInfo());
+        } }));
+
     var UnicodeDescriptor = function (value) {
         this.value = value;
     };
@@ -8802,6 +8939,7 @@
         VariableCall: VariableCall,
         NamespaceValue: NamespaceValue,
         Scope: Scope,
+        StartingStyle: StartingStyle,
         mixin: {
             Call: MixinCall,
             Definition: Definition
