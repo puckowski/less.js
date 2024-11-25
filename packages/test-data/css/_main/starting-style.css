@@ -23,3 +23,19 @@
   transition: background-color 2.5s;
   background-color: red;
 }
+source:first {
+  opacity: 1;
+  transform: scaleX(1);
+  @starting-style {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+#footer {
+  color: yellow;
+}
+@starting-style {
+  #footer {
+    background-color: transparent;
+  }
+}
