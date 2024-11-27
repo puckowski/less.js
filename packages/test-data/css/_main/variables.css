@@ -69,3 +69,6 @@
   mul-px-2: 140px;
   mul-px-3: 140px;
 }
+.radio_checked {
+  border-color: #fff;
+}
