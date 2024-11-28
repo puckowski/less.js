@@ -1,0 +1,95 @@
+@scope (.light-scheme) {
+
+    /* Only match links inside a light-scheme */
+    a {
+        color: darkmagenta;
+    }
+}
+
+@scope (.dark-scheme) {
+
+    /* Only match links inside a dark-scheme */
+    a {
+        color: plum;
+    }
+}
+
+@scope (.media-object) {
+
+    /* Only match author images inside a media-object */
+    .author-image {
+        border-radius: 50%;
+    }
+}
+
+@scope ([data-scope='main-component']) to ([data-scope]) {
+    p {
+        color: red;
+    }
+
+    /* only the outer section is part of the outer scope */
+    section {
+        background: snow;
+    }
+}
+
+@scope ([data-scope='sub-component']) to ([data-scope]) {
+    p {
+        color: blue;
+    }
+
+    /* the inner section is only part of the inner scope */
+    section {
+        color: ghostwhite;
+    }
+}
+
+@scope (#my-component) {
+    :scope {
+        border: thin solid;
+    }
+
+    & {
+        border: thin solid;
+    }
+
+    main :scope p {
+        color: green;
+    }
+
+    main & p {
+        color: green;
+    }
+}
+
+@scope (.parent-scope) {
+    @scope (:scope > .child-scope) to (:scope .limit) {
+        :scope .content {
+            color: red;
+        }
+    }
+}
+
+.widget.discoverresults, .widget.repositoriesresults {
+    color: #eee;
+
+    @scope (.light-scheme) {
+
+        /* Only match links inside a light-scheme */
+        a {
+            color: darkmagenta;
+        }
+    }
+}
+
+.widget.discoverresults, .widget.repositoriesresults {
+    color: #eee;
+
+    @scope (.parent-scope) {
+        @scope (:scope > .child-scope) to (:scope .limit) {
+            :scope .content {
+                color: red;
+            }
+        }
+    }
+}

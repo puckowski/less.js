@@ -9,3 +9,8 @@ export const ContainerSyntaxOptions = {
 export const StartingStyleSyntaxOptions = {
     queryInParens: false
 };
+
+export const ScopeSyntaxOptions = {
+    queryInParens: true,
+    scopeAtRule: true
+};
