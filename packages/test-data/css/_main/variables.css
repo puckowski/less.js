@@ -84,3 +84,6 @@ div#carrot {
 div#potato {
   color: blue;
 }
+.radio_checked {
+  border-color: #fff;
+}

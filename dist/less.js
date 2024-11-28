@@ -3271,6 +3271,34 @@
         scopeAtRule: true
     };
 
+    var Anonymous = function (value, index, currentFileInfo, mapLines, rulesetLike, visibilityInfo) {
+        this.value = value;
+        this._index = index;
+        this._fileInfo = currentFileInfo;
+        this.mapLines = mapLines;
+        this.rulesetLike = (typeof rulesetLike === 'undefined') ? false : rulesetLike;
+        this.allowRoot = true;
+        this.copyVisibilityInfo(visibilityInfo);
+    };
+    Anonymous.prototype = Object.assign(new Node(), {
+        type: 'Anonymous',
+        eval: function () {
+            return new Anonymous(this.value, this._index, this._fileInfo, this.mapLines, this.rulesetLike, this.visibilityInfo());
+        },
+        compare: function (other) {
+            return other.toCSS && this.toCSS() === other.toCSS() ? 0 : undefined;
+        },
+        isRulesetLike: function () {
+            return this.rulesetLike;
+        },
+        genCSS: function (context, output) {
+            this.nodeVisible = Boolean(this.value);
+            if (this.nodeVisible) {
+                output.add(this.value, this._fileInfo, this._index, this.mapLines);
+            }
+        }
+    });
+
     //
     // less.js - parser
     //
@@ -4435,9 +4463,26 @@
                     if (!e) {
                         parserInput.save();
                         if (parserInput.$char('(')) {
-                            if ((v = this.selector(false)) && parserInput.$char(')')) {
-                                e = new (tree.Paren)(v);
-                                parserInput.forget();
+                            if ((v = this.selector(false))) {
+                                var selectors = [];
+                                while (parserInput.$char(',')) {
+                                    selectors.push(v);
+                                    selectors.push(new Anonymous(','));
+                                    v = this.selector(false);
+                                }
+                                selectors.push(v);
+                                if (parserInput.$char(')')) {
+                                    if (selectors.length > 1) {
+                                        e = new (tree.Paren)(new Selector(selectors));
+                                    }
+                                    else {
+                                        e = new (tree.Paren)(v);
+                                    }
+                                    parserInput.forget();
+                                }
+                                else {
+                                    parserInput.restore('Missing closing \')\'');
+                                }
                             }
                             else {
                                 parserInput.restore('Missing closing \')\'');
@@ -4528,6 +4573,9 @@
                                 error('Extend can only be used at the end of selector');
                             }
                             c = parserInput.currentChar();
+                            if (Array.isArray(e)) {
+                                e.forEach(function (ele) { return elements.push(ele); });
+                            }
                             if (elements) {
                                 elements.push(e);
                             }
@@ -4826,7 +4874,9 @@
                                 }
                                 // Treat like quoted values, but replace vars like unquoted expressions
                                 var quote = new tree.Quoted('\'', item, true, index, fileInfo);
-                                quote.variableRegex = /@([\w-]+)/g;
+                                if (!item.startsWith('@{')) {
+                                    quote.variableRegex = /@([\w-]+)/g;
+                                }
                                 quote.propRegex = /\$([\w-]+)/g;
                                 result.push(quote);
                             }
@@ -5512,7 +5562,7 @@
                     var index = parserInput.i;
                     do {
                         e = this.comment();
-                        if (e) {
+                        if (e && !e.isLineComment) {
                             entities.push(e);
                             continue;
                         }
@@ -5772,34 +5822,6 @@
     });
     Keyword.True = new Keyword('true');
     Keyword.False = new Keyword('false');
-
-    var Anonymous = function (value, index, currentFileInfo, mapLines, rulesetLike, visibilityInfo) {
-        this.value = value;
-        this._index = index;
-        this._fileInfo = currentFileInfo;
-        this.mapLines = mapLines;
-        this.rulesetLike = (typeof rulesetLike === 'undefined') ? false : rulesetLike;
-        this.allowRoot = true;
-        this.copyVisibilityInfo(visibilityInfo);
-    };
-    Anonymous.prototype = Object.assign(new Node(), {
-        type: 'Anonymous',
-        eval: function () {
-            return new Anonymous(this.value, this._index, this._fileInfo, this.mapLines, this.rulesetLike, this.visibilityInfo());
-        },
-        compare: function (other) {
-            return other.toCSS && this.toCSS() === other.toCSS() ? 0 : undefined;
-        },
-        isRulesetLike: function () {
-            return this.rulesetLike;
-        },
-        genCSS: function (context, output) {
-            this.nodeVisible = Boolean(this.value);
-            if (this.nodeVisible) {
-                output.add(this.value, this._fileInfo, this._index, this.mapLines);
-            }
-        }
-    });
 
     var MATH$1 = Math$1;
     function evalName(context, name) {

@@ -141,3 +141,14 @@ each(@items, {
     color: blue;
   }
 })
+
+@a1: 1px;
+@b2: 2px;
+@c3: @a1 + @b2;
+
+@radio-cls: radio;
+@radio-cls-checked: @{radio-cls}_checked;
+
+.@{radio-cls-checked} {
+  border-color: #fff;
+}
