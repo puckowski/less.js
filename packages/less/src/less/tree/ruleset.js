@@ -570,6 +570,8 @@ Ruleset.prototype = Object.assign(new Node(), {
             context.tabLevel--;
         }
 
+        context.scopeRuleOffset = 0;
+
         if (!output.isEmpty() && !context.compress && this.firstRoot) {
             output.add('\n');
         }
