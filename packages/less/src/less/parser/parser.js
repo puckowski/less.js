@@ -2392,7 +2392,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                 do {
                     e = this.comment();
-                    if (e) {
+                    if (e && !e.isLineComment) {
                         entities.push(e);
                         continue;
                     }
