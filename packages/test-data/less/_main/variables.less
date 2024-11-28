@@ -125,3 +125,19 @@
     mul-px-3: ((@px * 1) * @cm);
   }
 }
+
+@items:
+// Fruit
+    apple,
+    banana,
+    cherry,
+// Vegetables
+    carrot,
+    potato,
+;
+
+each(@items, {
+  div#@{value} {
+    color: blue;
+  }
+})
