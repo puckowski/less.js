@@ -4750,7 +4750,12 @@
                             merge = !isVariable && name.length > 1 && name.pop().value;
                             // Custom property values get permissive parsing
                             if (name[0].value && name[0].value.slice(0, 2) === '--') {
-                                value = this.permissiveValue(/[;}]/);
+                                if (parserInput.$char(';')) {
+                                    value = new Anonymous('');
+                                }
+                                else {
+                                    value = this.permissiveValue(/[;}]/);
+                                }
                             }
                             // Try to store values as anonymous
                             // If we need the value later we'll re-parse it in ruleset.parseValue
@@ -8084,6 +8089,7 @@
         this.op2 = op2 ? op2.trim() : null;
         this.rvalue = r;
         this._index = i;
+        this.mvalues = [];
     };
     QueryInParens.prototype = Object.assign(new Node(), {
         type: 'QueryInParens',
@@ -8096,7 +8102,33 @@
         },
         eval: function (context) {
             this.lvalue = this.lvalue.eval(context);
-            this.mvalue = this.mvalue.eval(context);
+            var hasVariable = false;
+            var rule;
+            for (var i_1 = 0; (rule = context.frames[i_1]); i_1++) {
+                if (rule.type === 'Ruleset') {
+                    rule.rules.filter(function (r) {
+                        if ((r instanceof Declaration) && r.variable) {
+                            hasVariable = true;
+                        }
+                    });
+                    if (hasVariable) {
+                        break;
+                    }
+                }
+            }
+            if (!this.mvalueCopy) {
+                this.mvalueCopy = copy(this.mvalue);
+            }
+            if (hasVariable) {
+                this.mvalue = this.mvalueCopy;
+            }
+            if (hasVariable) {
+                this.mvalue = this.mvalue.eval(context);
+                this.mvalues.push(this.mvalue);
+            }
+            else {
+                this.mvalue = this.mvalue.eval(context);
+            }
             if (this.rvalue) {
                 this.rvalue = this.rvalue.eval(context);
             }
@@ -8105,6 +8137,9 @@
         genCSS: function (context, output) {
             this.lvalue.genCSS(context, output);
             output.add(' ' + this.op + ' ');
+            if (this.mvalues.length > 0) {
+                this.mvalue = this.mvalues.shift();
+            }
             this.mvalue.genCSS(context, output);
             if (this.rvalue) {
                 output.add(' ' + this.op2 + ' ');
