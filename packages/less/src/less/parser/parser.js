@@ -5,6 +5,7 @@ import getParserInput from './parser-input';
 import * as utils from '../utils';
 import functionRegistry from '../functions/function-registry';
 import { ContainerSyntaxOptions, MediaSyntaxOptions } from '../tree/atrule-syntax';
+import Anonymous from '../tree/anonymous';
 
 //
 // less.js - parser
@@ -1578,7 +1579,11 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                         // Custom property values get permissive parsing
                         if (name[0].value && name[0].value.slice(0, 2) === '--') {
-                            value = this.permissiveValue(/[;}]/);
+                            if (parserInput.$char(';')) {
+                                value = new Anonymous('');
+                            } else {
+                                value = this.permissiveValue(/[;}]/);
+                            }
                         }
                         // Try to store values as anonymous
                         // If we need the value later we'll re-parse it in ruleset.parseValue
