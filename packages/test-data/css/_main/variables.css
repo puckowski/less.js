@@ -87,3 +87,11 @@ div#potato {
 .radio_checked {
   border-color: #fff;
 }
+*,
+::before,
+::after {
+  --tw-pan-x: ;
+  --tw-pan-y: ;
+  --tw-pinch-zoom: ;
+  --tw-scroll-snap-strictness: proximity;
+}
