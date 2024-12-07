@@ -3,6 +3,6 @@
   --basic-deg-tan: tan(var(--basic-deg));
 }
 .test2 {
-  --some-var: 5px;
-  prop: min(100% - var(--some-var), 10px);
+  --some-var: 5%;
+  prop: min(95%, 10px);
 }
