@@ -7272,6 +7272,20 @@
         return functionCaller;
     }());
 
+    /* eslint-disable no-prototype-builtins */
+    var CustomProperty = function (name, initialValue, index, currentFileInfo) {
+        this.name = name;
+        this.initialValue = initialValue;
+        this._index = index;
+        this._fileInfo = currentFileInfo;
+    };
+    CustomProperty.prototype = Object.assign(new Node(), {
+        type: 'CustomProperty',
+        genCSS: function (context, output) {
+            output.add('var(' + this.name + (this.initialValue ? ', ' + this.initialValue : '') + ')');
+        }
+    });
+
     //
     // A function call node.
     //
@@ -7359,10 +7373,32 @@
         },
         genCSS: function (context, output) {
             output.add("".concat(this.name, "("), this.fileInfo(), this.getIndex());
+            var isCustomProperty = false;
+            var customExpressionCount = 0;
             for (var i_1 = 0; i_1 < this.args.length; i_1++) {
                 this.args[i_1].genCSS(context, output);
+                if (this.args[i_1] instanceof CustomProperty
+                    || ((i_1 + 2 < this.args.length && this.args[i_1 + 2] instanceof CustomProperty))) {
+                    if (isCustomProperty) {
+                        isCustomProperty = false;
+                    }
+                    else {
+                        isCustomProperty = true;
+                        customExpressionCount = 1;
+                    }
+                }
+                if (customExpressionCount === 3) {
+                    isCustomProperty = false;
+                    customExpressionCount = 0;
+                }
                 if (i_1 + 1 < this.args.length) {
-                    output.add(', ');
+                    if (!isCustomProperty) {
+                        output.add(', ');
+                    }
+                    else {
+                        output.add(' ');
+                        customExpressionCount++;
+                    }
                 }
             }
             output.add(')');
@@ -7437,37 +7473,6 @@
         accept: function (visitor) {
             this.operands = visitor.visitArray(this.operands);
         },
-        find: function (obj, fun) {
-            for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
-                r = fun.call(obj, obj[i_2]);
-                if (r) {
-                    return r;
-                }
-            }
-            return null;
-        },
-        evalVariable: function (context, operand) {
-            if (operand.name === 'var' && operand.args.length === 1) {
-                var varName = operand.args[0].toCSS();
-                var variable = this.find(context.frames, function (frame) {
-                    var v = frame.variable(varName);
-                    if (v) {
-                        if (v.important) {
-                            var importantScope = context.importantScope[context.importantScope.length - 1];
-                            importantScope.important = v.important;
-                        }
-                        // If in calc, wrap vars in a function call to cascade evaluate args first
-                        if (context.inCalc) {
-                            return (new Call('_SELF', [v.value])).eval(context);
-                        }
-                        else {
-                            return v.value.eval(context);
-                        }
-                    }
-                });
-                return variable;
-            }
-        },
         eval: function (context) {
             var a = this.evalVariable(context, this.operands[0]);
             if (!a) {
@@ -7498,6 +7503,12 @@
                         return b.operate(context, op, a);
                     }
                 }
+                if (a instanceof Dimension && b instanceof CustomProperty) {
+                    return [a, new Anonymous(op), b];
+                }
+                if (b instanceof Dimension && a instanceof CustomProperty) {
+                    return [a, new Anonymous(op), b];
+                }
                 if (!a.operate || !b.operate) {
                     if ((a instanceof Operation || b instanceof Operation)
                         && a.op === '/' && context.math === MATH.PARENS_DIVISION) {
@@ -7522,7 +7533,38 @@
                 output.add(' ');
             }
             this.operands[1].genCSS(context, output);
-        }
+        },
+        find: function (obj, fun) {
+            for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
+                r = fun.call(obj, obj[i_2]);
+                if (r) {
+                    return r;
+                }
+            }
+            return null;
+        },
+        evalVariable: function (context, operand) {
+            if (operand.name === 'var' && operand.args.length >= 1) {
+                var varName = operand.args[0].toCSS();
+                var variable = this.find(context.frames, function (frame) {
+                    var v = frame.variable(varName);
+                    if (v) {
+                        if (v.important) {
+                            var importantScope = context.importantScope[context.importantScope.length - 1];
+                            importantScope.important = v.important;
+                        }
+                        // If in calc, wrap vars in a function call to cascade evaluate args first
+                        if (context.inCalc) {
+                            return (new Call('_SELF', [v.value])).eval(context);
+                        }
+                        else {
+                            return new CustomProperty(v.name, operand.args[1] ? operand.args[1].toCSS() : null, 0, {});
+                        }
+                    }
+                });
+                return variable;
+            }
+        },
     });
 
     var Property = function (name, index, currentFileInfo) {
@@ -10056,23 +10098,10 @@
         }
     };
 
-    /* eslint-disable no-prototype-builtins */
-    var CustomProperty = function (name, index, currentFileInfo) {
-        this.name = name;
-        this._index = index;
-        this._fileInfo = currentFileInfo;
-    };
-    CustomProperty.prototype = Object.assign(new Node(), {
-        type: 'CustomProperty',
-        genCSS: function (context, output) {
-            output.add('var(' + this.name + ')');
-        }
-    });
-
     var MathHelper = function (fn, unit, n) {
         if (n instanceof Call && n.name === 'var') {
-            if (n.args && n.args.length === 1) {
-                return new Call(fn.name, [new CustomProperty(n.args[0].toCSS(), n._index, n._fileInfo)], n._index, n._fileInfo);
+            if (n.args && n.args.length >= 1) {
+                return new Call(fn.name, [new CustomProperty(n.args[0].toCSS(), n.args[1] ? n.args[1].toCSS() : null, n._index, n._fileInfo)], n._index, n._fileInfo);
             }
             else {
                 throw { type: 'Argument', message: 'var must contain one expression' };
@@ -10199,6 +10228,10 @@
             return new Dimension(a.value % b.value, a.unit);
         },
         pow: function (x, y) {
+            if (x instanceof Call || y instanceof Call) {
+                // Must return Node
+                return new Anonymous(x.toCSS() + ', ' + y.toCSS());
+            }
             if (typeof x === 'number' && typeof y === 'number') {
                 x = new Dimension(x);
                 y = new Dimension(y);
