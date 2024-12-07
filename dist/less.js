@@ -3999,6 +3999,17 @@
                     }
                 },
                 //
+                // The custom property part of a variable definition.
+                //
+                //     --fink:
+                //
+                customProperty: function () {
+                    var name;
+                    if (parserInput.currentChar() === '-' && (name = parserInput.$re(/^(--[\w-]+)\s*:/))) {
+                        return name[1];
+                    }
+                },
+                //
                 // Call a variable value to retrieve a detached ruleset
                 // or a value from a detached ruleset's rules.
                 //
@@ -4733,7 +4744,7 @@
                         return;
                     }
                     parserInput.save();
-                    name = this.variable() || this.ruleProperty();
+                    name = this.variable() || this.customProperty() || this.ruleProperty();
                     if (name) {
                         isVariable = typeof name === 'string';
                         if (isVariable) {
@@ -4749,7 +4760,7 @@
                             // where each item is a tree.Keyword or tree.Variable
                             merge = !isVariable && name.length > 1 && name.pop().value;
                             // Custom property values get permissive parsing
-                            if (name[0].value && name[0].value.slice(0, 2) === '--') {
+                            if (isVariable && name.startsWith('--')) {
                                 if (parserInput.$char(';')) {
                                     value = new Anonymous('');
                                 }
@@ -6232,7 +6243,7 @@
         variables: function () {
             if (!this._variables) {
                 this._variables = !this.rules ? {} : this.rules.reduce(function (hash, r) {
-                    if (r instanceof Declaration && r.variable === true) {
+                    if (r instanceof Declaration && (r.variable === true || (typeof r.name === 'string' && r.name.startsWith('--')))) {
                         hash[r.name] = r;
                     }
                     // when evaluating variables in an import statement, imports have not been eval'd
@@ -7148,54 +7159,6 @@
         }
     });
 
-    var MATH = Math$1;
-    var Operation = function (op, operands, isSpaced) {
-        this.op = op.trim();
-        this.operands = operands;
-        this.isSpaced = isSpaced;
-    };
-    Operation.prototype = Object.assign(new Node(), {
-        type: 'Operation',
-        accept: function (visitor) {
-            this.operands = visitor.visitArray(this.operands);
-        },
-        eval: function (context) {
-            var a = this.operands[0].eval(context), b = this.operands[1].eval(context), op;
-            if (context.isMathOn(this.op)) {
-                op = this.op === './' ? '/' : this.op;
-                if (a instanceof Dimension && b instanceof Color) {
-                    a = a.toColor();
-                }
-                if (b instanceof Dimension && a instanceof Color) {
-                    b = b.toColor();
-                }
-                if (!a.operate || !b.operate) {
-                    if ((a instanceof Operation || b instanceof Operation)
-                        && a.op === '/' && context.math === MATH.PARENS_DIVISION) {
-                        return new Operation(this.op, [a, b], this.isSpaced);
-                    }
-                    throw { type: 'Operation',
-                        message: 'Operation on an invalid type' };
-                }
-                return a.operate(context, op, b);
-            }
-            else {
-                return new Operation(this.op, [a, b], this.isSpaced);
-            }
-        },
-        genCSS: function (context, output) {
-            this.operands[0].genCSS(context, output);
-            if (this.isSpaced) {
-                output.add(' ');
-            }
-            output.add(this.op);
-            if (this.isSpaced) {
-                output.add(' ');
-            }
-            this.operands[1].genCSS(context, output);
-        }
-    });
-
     var Expression = function (value, noSpacing) {
         this.value = value;
         this.noSpacing = noSpacing;
@@ -7460,6 +7423,105 @@
                 }
             }
             return null;
+        }
+    });
+
+    var MATH = Math$1;
+    var Operation = function (op, operands, isSpaced) {
+        this.op = op.trim();
+        this.operands = operands;
+        this.isSpaced = isSpaced;
+    };
+    Operation.prototype = Object.assign(new Node(), {
+        type: 'Operation',
+        accept: function (visitor) {
+            this.operands = visitor.visitArray(this.operands);
+        },
+        find: function (obj, fun) {
+            for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
+                r = fun.call(obj, obj[i_2]);
+                if (r) {
+                    return r;
+                }
+            }
+            return null;
+        },
+        evalVariable: function (context, operand) {
+            if (operand.name === 'var' && operand.args.length === 1) {
+                var varName = operand.args[0].toCSS();
+                var variable = this.find(context.frames, function (frame) {
+                    var v = frame.variable(varName);
+                    if (v) {
+                        if (v.important) {
+                            var importantScope = context.importantScope[context.importantScope.length - 1];
+                            importantScope.important = v.important;
+                        }
+                        // If in calc, wrap vars in a function call to cascade evaluate args first
+                        if (context.inCalc) {
+                            return (new Call('_SELF', [v.value])).eval(context);
+                        }
+                        else {
+                            return v.value.eval(context);
+                        }
+                    }
+                });
+                return variable;
+            }
+        },
+        eval: function (context) {
+            var a = this.evalVariable(context, this.operands[0]);
+            if (!a) {
+                a = this.operands[0].eval(context);
+            }
+            var b = this.evalVariable(context, this.operands[1]);
+            if (!b) {
+                b = this.operands[1].eval(context);
+            }
+            var op;
+            if (context.isMathOn(this.op)) {
+                op = this.op === './' ? '/' : this.op;
+                if (a instanceof Dimension && b instanceof Color) {
+                    a = a.toColor();
+                }
+                if (b instanceof Dimension && a instanceof Color) {
+                    b = b.toColor();
+                }
+                if (a instanceof Dimension && b instanceof Call && b.name === 'var') {
+                    if (b.args && b.args.length === 1) {
+                        b = new Variable(b.args[0].toCSS(), 0, {});
+                        return a.operate(context, op, b);
+                    }
+                }
+                if (b instanceof Dimension && a instanceof Call && a.name === 'var') {
+                    if (a.args && a.args.length === 1) {
+                        a = new Variable(a.args[0].toCSS(), 0, {});
+                        return b.operate(context, op, a);
+                    }
+                }
+                if (!a.operate || !b.operate) {
+                    if ((a instanceof Operation || b instanceof Operation)
+                        && a.op === '/' && context.math === MATH.PARENS_DIVISION) {
+                        return new Operation(this.op, [a, b], this.isSpaced);
+                    }
+                    throw { type: 'Operation',
+                        message: 'Operation on an invalid type' };
+                }
+                return a.operate(context, op, b);
+            }
+            else {
+                return new Operation(this.op, [a, b], this.isSpaced);
+            }
+        },
+        genCSS: function (context, output) {
+            this.operands[0].genCSS(context, output);
+            if (this.isSpaced) {
+                output.add(' ');
+            }
+            output.add(this.op);
+            if (this.isSpaced) {
+                output.add(' ');
+            }
+            this.operands[1].genCSS(context, output);
         }
     });
 
@@ -9994,7 +10056,28 @@
         }
     };
 
+    /* eslint-disable no-prototype-builtins */
+    var CustomProperty = function (name, index, currentFileInfo) {
+        this.name = name;
+        this._index = index;
+        this._fileInfo = currentFileInfo;
+    };
+    CustomProperty.prototype = Object.assign(new Node(), {
+        type: 'CustomProperty',
+        genCSS: function (context, output) {
+            output.add('var(' + this.name + ')');
+        }
+    });
+
     var MathHelper = function (fn, unit, n) {
+        if (n instanceof Call && n.name === 'var') {
+            if (n.args && n.args.length === 1) {
+                return new Call(fn.name, [new CustomProperty(n.args[0].toCSS(), n._index, n._fileInfo)], n._index, n._fileInfo);
+            }
+            else {
+                throw { type: 'Argument', message: 'var must contain one expression' };
+            }
+        }
         if (!(n instanceof Dimension)) {
             throw { type: 'Argument', message: 'argument must be a number' };
         }
