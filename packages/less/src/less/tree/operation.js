@@ -49,9 +49,8 @@ Operation.prototype = Object.assign(new Node(), {
                     }
                 }
             });
-            if (variable) {
-                return variable;
-            }
+            
+            return variable;
         }
     },
 
