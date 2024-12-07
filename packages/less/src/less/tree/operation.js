@@ -2,8 +2,10 @@ import Node from './node';
 import Color from './color';
 import Dimension from './dimension';
 import * as Constants from '../constants';
-import Variable from './variable';
 import Call from './call';
+import CustomProperty from './custom-property';
+import Variable from './variable';
+import Anonymous from './anonymous';
 const MATH = Constants.Math;
 
 
@@ -18,40 +20,6 @@ Operation.prototype = Object.assign(new Node(), {
 
     accept(visitor) {
         this.operands = visitor.visitArray(this.operands);
-    },
-
-    find: function (obj, fun) {
-        for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
-            r = fun.call(obj, obj[i_2]);
-            if (r) {
-                return r;
-            }
-        }
-        return null;
-    },
-
-    evalVariable: function (context, operand) {
-        if (operand.name === 'var' && operand.args.length === 1) {
-            var varName = operand.args[0].toCSS();
-            var variable = this.find(context.frames, function (frame) {
-                var v = frame.variable(varName);
-                if (v) {
-                    if (v.important) {
-                        var importantScope = context.importantScope[context.importantScope.length - 1];
-                        importantScope.important = v.important;
-                    }
-                    // If in calc, wrap vars in a function call to cascade evaluate args first
-                    if (context.inCalc) {
-                        return (new Call('_SELF', [v.value])).eval(context);
-                    }
-                    else {
-                        return v.value.eval(context);
-                    }
-                }
-            });
-            
-            return variable;
-        }
     },
 
     eval(context) {
@@ -85,6 +53,12 @@ Operation.prototype = Object.assign(new Node(), {
                     return b.operate(context, op, a);
                 }
             }
+            if (a instanceof Dimension && b instanceof CustomProperty) {
+                return [a, new Anonymous(op), b];
+            }
+            if (b instanceof Dimension && a instanceof CustomProperty) {
+                return [a, new Anonymous(op), b];
+            }
             if (!a.operate || !b.operate) {
                 if (
                     (a instanceof Operation || b instanceof Operation)
@@ -112,7 +86,41 @@ Operation.prototype = Object.assign(new Node(), {
             output.add(' ');
         }
         this.operands[1].genCSS(context, output);
-    }
+    },
+
+    find: function (obj, fun) {
+        for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
+            r = fun.call(obj, obj[i_2]);
+            if (r) {
+                return r;
+            }
+        }
+        return null;
+    },
+
+    evalVariable: function (context, operand) {
+        if (operand.name === 'var' && operand.args.length >= 1) {
+            var varName = operand.args[0].toCSS();
+            var variable = this.find(context.frames, function (frame) {
+                var v = frame.variable(varName);
+                if (v) {
+                    if (v.important) {
+                        var importantScope = context.importantScope[context.importantScope.length - 1];
+                        importantScope.important = v.important;
+                    }
+                    // If in calc, wrap vars in a function call to cascade evaluate args first
+                    if (context.inCalc) {
+                        return (new Call('_SELF', [v.value])).eval(context);
+                    }
+                    else {
+                        return new CustomProperty(v.name, operand.args[1] ? operand.args[1].toCSS() : null, 0, {});
+                    }
+                }
+            });
+            
+            return variable;
+        }
+    },
 });
 
 export default Operation;
