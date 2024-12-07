@@ -2,6 +2,8 @@ import Node from './node';
 import Color from './color';
 import Dimension from './dimension';
 import * as Constants from '../constants';
+import Variable from './variable';
+import Call from './call';
 const MATH = Constants.Math;
 
 
@@ -18,8 +20,51 @@ Operation.prototype = Object.assign(new Node(), {
         this.operands = visitor.visitArray(this.operands);
     },
 
+    find: function (obj, fun) {
+        for (var i_2 = 0, r = void 0; i_2 < obj.length; i_2++) {
+            r = fun.call(obj, obj[i_2]);
+            if (r) {
+                return r;
+            }
+        }
+        return null;
+    },
+
+    evalVariable: function (context, operand) {
+        if (operand.name === 'var' && operand.args.length === 1) {
+            var varName = operand.args[0].toCSS();
+            var variable = this.find(context.frames, function (frame) {
+                var v = frame.variable(varName);
+                if (v) {
+                    if (v.important) {
+                        var importantScope = context.importantScope[context.importantScope.length - 1];
+                        importantScope.important = v.important;
+                    }
+                    // If in calc, wrap vars in a function call to cascade evaluate args first
+                    if (context.inCalc) {
+                        return (new Call('_SELF', [v.value])).eval(context);
+                    }
+                    else {
+                        return v.value.eval(context);
+                    }
+                }
+            });
+            if (variable) {
+                return variable;
+            }
+        }
+    },
+
     eval(context) {
-        let a = this.operands[0].eval(context), b = this.operands[1].eval(context), op;
+        var a = this.evalVariable(context, this.operands[0])
+        if (!a) {
+            a = this.operands[0].eval(context)
+        }
+        var b = this.evalVariable(context, this.operands[1]);
+        if (!b) {
+            b = this.operands[1].eval(context);
+        }
+        var op;
 
         if (context.isMathOn(this.op)) {
             op = this.op === './' ? '/' : this.op;
@@ -28,6 +73,18 @@ Operation.prototype = Object.assign(new Node(), {
             }
             if (b instanceof Dimension && a instanceof Color) {
                 b = b.toColor();
+            }
+            if (a instanceof Dimension && b instanceof Call && b.name === 'var') {
+                if (b.args && b.args.length === 1) {
+                    b = new Variable(b.args[0].toCSS(), 0, {});
+                    return a.operate(context, op, b);
+                }
+            }
+            if (b instanceof Dimension && a instanceof Call && a.name === 'var') {
+                if (a.args && a.args.length === 1) {
+                    a = new Variable(a.args[0].toCSS(), 0, {});
+                    return b.operate(context, op, a);
+                }
             }
             if (!a.operate || !b.operate) {
                 if (
