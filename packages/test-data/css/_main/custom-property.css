@@ -6,3 +6,11 @@
   --some-var: 5%;
   prop: min(95%, 10px);
 }
+.test3 {
+  --some-var: 55%;
+  prop: min(60%, 15px);
+}
+.test4 {
+  color: red;
+  --other-color: green;
+}
