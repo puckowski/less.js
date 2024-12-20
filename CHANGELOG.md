@@ -1,5 +1,18 @@
 ## Change Log
 
+### v4.2.1.5
+
+Less.js 4.2.1 with fixes for:
+less#4301
+less#4252
+less#3737
+less#4258
+less#4264
+less#4268
+less#4267
+less#3777
+less#4224
+
 ### v4.2.1.3 (2024-12-07)
 
 Less.js 4.2.1 with fixes for:
