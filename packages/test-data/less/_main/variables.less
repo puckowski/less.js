@@ -126,6 +126,24 @@
   }
 }
 
+*, ::before, ::after {
+	--tw-pan-x:  ;
+	--tw-pan-y:  ;
+	--tw-pinch-zoom:  ;
+	--tw-scroll-snap-strictness: proximity;
+}
+
+@a1: 1px;
+@b2: 2px;
+@c3: @a1 + @b2;
+
+@radio-cls: radio;
+@radio-cls-checked: @{radio-cls}_checked;
+
+.@{radio-cls-checked} {
+  border-color: #fff;
+}
+
 @items:
 // Fruit
     apple,
