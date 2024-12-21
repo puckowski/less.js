@@ -39,3 +39,26 @@ source:first {
     background-color: transparent;
   }
 }
+@media only screen and (min-width: 768px) {
+  @starting-style {
+    .primary-content {
+      font-size: 1rem;
+    }
+  }
+}
+@media only screen and (min-width: 768px) {
+  .media-1 {
+    font-size: 1.5rem;
+  }
+  @starting-style {
+    .primary-content {
+      font-size: 1rem;
+    }
+    @media (hover: hover) {
+      font-size: 1.75rem;
+    }
+  }
+  .media-2 {
+    font-size: 2rem;
+  }
+}
