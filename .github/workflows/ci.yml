@@ -1,5 +1,5 @@
 # Github actions workflow name
-name: Nodejs Test
+name: CI
 
 # Triggers the workflow on push or pull request events
 on:
@@ -9,13 +9,31 @@ on:
     branches: [main, master]
 
 jobs:
-  platform_spec_test:
-    name: 'Tests on ${{matrix.os}} with node${{matrix.node}}'
+  basic_node_test:
+    name: 'Basic tests on ubuntu-latest with nodejs v22 (current LTS version)'
+    runs-on: ubuntu-latest
+    steps:
+     - uses: actions/checkout@v2
+     - uses: actions/setup-node@v2
+       with:
+         node-version: ${{ matrix.node }}
+     - name: Install npm dependencies
+       run: npm install
+     - name: Print put node & npm version
+       run: node --version && npm --version 
+     - name: Install chromium
+       run: npx playwright install chromium
+     - name: Run unit test
+       run: npm run test
+
+  windows_and_macos_test:
+    name: 'Platform tests on ${{matrix.os}} with nodejs v${{matrix.node}}'
+    needs: basic_node_test
     strategy:
       matrix:
         # Test all mainstream operating system
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [18]
+        os: [macos-latest, windows-latest]
+        node: [22]
     runs-on: ${{ matrix.os }}
     steps:
      # Pull repo to test machine
@@ -30,15 +48,18 @@ jobs:
      - name: Print put node & npm version
        # Output useful info for debugging.
        run: node --version && npm --version 
+     - name: Install chromium
+       run: npx playwright install chromium
      - name: Run unit test
        run: npm run test
 
-  fast_node_test:
-    name: 'Tests on ${{matrix.os}} with node${{matrix.node}}'
+  historical_versions_node_test:
+    name: 'Historical version nodejs v${{matrix.node}} test'
+    needs: basic_node_test
     strategy:
       matrix:
         os: [ubuntu-latest]
-        node: [10, 12, 14, 16, 20]
+        node: [14, 16, 18, 20]
     runs-on: ${{ matrix.os }}
     steps:
      - uses: actions/checkout@v2
@@ -49,5 +70,63 @@ jobs:
        run: npm install
      - name: Print put node & npm version
        run: node --version && npm --version 
+     - name: Install chromium
+       run: npx playwright install chromium
      - name: Run unit test
        run: npm run test
+
+  latest_nodejs_testing_node23:
+    name: 'Latest nodejs v23 test'
+    needs: basic_node_test
+    runs-on: ubuntu-latest
+    steps:
+     - uses: actions/checkout@v2
+     - uses: actions/setup-node@v2
+       with:
+         node-version: 23
+     - name: Install npm dependencies
+       run: npm install
+     - name: Print put node & npm version
+       run: node --version && npm --version 
+     - name: Install chromium
+       run: npx playwright install chromium
+     - name: Run unit test
+       run: npm run test
+
+  update-changelog:
+    if: ${{ github.event_name == 'push' && contains(join(github.event.commits.*.message, ' '), 'Release v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          # Ensure we can push back to the repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Changelog
+        run: npm run changelog
+
+      - name: Commit and Push Changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            git add CHANGELOG.md
+            git commit -m "chore(release): update CHANGELOG [ci]"
+            git push origin HEAD:master
+          else
+            echo "No changes to commit."
+          fi
