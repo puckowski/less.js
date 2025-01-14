@@ -125,7 +125,7 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git add CHANGELOG.md
             git commit -m "chore(release): update CHANGELOG [ci]"
-            git push
+            git push origin HEAD:master
           else
             echo "No changes to commit."
           fi
