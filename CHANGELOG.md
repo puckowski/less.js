@@ -3,6 +3,22 @@
 
 ### Bug Fixes
 
+* fix CI ([ae453bd](https://github.com/less/less.js/commit/ae453bd58f006dc3b37adf35519d83e509483b7e))
+* node23 ci ([#4309](https://github.com/less/less.js/issues/4309)) ([ab5c82f](https://github.com/less/less.js/commit/ab5c82f86f1e04c6eac9d4e1a29526893248b720))
+* Output correct css when using css function in max(). ([#4266](https://github.com/less/less.js/issues/4266)) ([b09ad0f](https://github.com/less/less.js/commit/b09ad0f62a502a326de7065a62fd69e29837bcc1))
+
+
+### Features
+
+* **meta 46:** update CI to update CHANGELOG ([2b010da](https://github.com/less/less.js/commit/2b010da80bde46aed34e11dce47125e7c1b8beb7))
+
+
+
+## [4.2.1](https://github.com/less/less.js/compare/4.1.3-container-queries-1...4.2.1) (2025-01-14)
+
+
+### Bug Fixes
+
 * node23 ci ([#4309](https://github.com/less/less.js/issues/4309)) ([ab5c82f](https://github.com/less/less.js/commit/ab5c82f86f1e04c6eac9d4e1a29526893248b720))
 * Output correct css when using css function in max(). ([#4266](https://github.com/less/less.js/issues/4266)) ([b09ad0f](https://github.com/less/less.js/commit/b09ad0f62a502a326de7065a62fd69e29837bcc1))
 
