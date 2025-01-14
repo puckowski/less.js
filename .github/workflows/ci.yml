@@ -94,7 +94,7 @@ jobs:
        run: npm run test
 
   update-changelog:
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && contains(join(github.event.commits.*.message, ' '), 'Release v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
