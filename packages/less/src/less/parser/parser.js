@@ -460,7 +460,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
 
                     parserInput.save();
 
-                    validCall = parserInput.$re(/^[\w]+\(/);
+                    validCall = parserInput.$re(/^[\w-]+\(/);
                     if (!validCall) {
                         parserInput.forget();
                         return;
