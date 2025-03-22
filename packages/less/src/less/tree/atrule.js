@@ -2,6 +2,7 @@ import Node from './node';
 import Selector from './selector';
 import Ruleset from './ruleset';
 import Anonymous from './anonymous';
+import NestableAtRulePrototype from './nested-at-rule';
 
 const AtRule = function(
     name,
@@ -14,19 +15,45 @@ const AtRule = function(
     visibilityInfo
 ) {
     let i;
+    var selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
 
     this.name  = name;
     this.value = (value instanceof Node) ? value : (value ? new Anonymous(value) : value);
     if (rules) {
         if (Array.isArray(rules)) {
-            this.rules = rules;
+            const allDeclarations = rules.filter(function (node) { return node.type === 'Declaration'; }).length === rules.length;
+            let allDeclarations2 = true;
+            rules.forEach(rule => {
+                if (rule.rules) allDeclarations2 = allDeclarations2 && rule.rules.filter(function (node) { return node.type === 'Declaration'; }).length === rule.rules.length
+            });
+            if (allDeclarations && !isRooted) {
+                this.simpleBlock = true;
+                this.declarations = rules;
+            }
+            else if (allDeclarations2 && !isRooted && !value) {
+                this.simpleBlock = true;
+                this.declarations = rules[0].rules;
+            }
+            else {
+                this.rules = rules;
+            }
         } else {
-            this.rules = [rules];
-            this.rules[0].selectors = (new Selector([], null, null, index, currentFileInfo)).createEmptySelectors();
+            const allDeclarations = rules.rules.filter(function (node) { return node.type === 'Declaration' && !node.merge}).length === rules.rules.length;
+            if (allDeclarations && !isRooted && !value) {
+                this.simpleBlock = true;
+                this.declarations = rules.rules;
+            }
+            else {
+                this.rules = [rules];
+                this.rules[0].selectors = (new Selector([], null, null, index, currentFileInfo)).createEmptySelectors();
+            }
         }
-        for (i = 0; i < this.rules.length; i++) {
-            this.rules[i].allowImports = true;
+        if (!this.simpleBlock) {
+            for (i = 0; i < this.rules.length; i++) {
+                this.rules[i].allowImports = true;
+            }
         }
+        this.setParent(selectors, this);
         this.setParent(this.rules, this);
     }
     this._index = index;
@@ -39,10 +66,17 @@ const AtRule = function(
 
 AtRule.prototype = Object.assign(new Node(), {
     type: 'AtRule',
+
+    ...NestableAtRulePrototype,
+
     accept(visitor) {
-        const value = this.value, rules = this.rules;
+        const value = this.value, rules = this.rules, declarations = this.declarations;
+
         if (rules) {
             this.rules = visitor.visitArray(rules);
+        }
+        else if (declarations) {
+            this.declarations = visitor.visitArray(declarations);   
         }
         if (value) {
             this.value = visitor.visit(value);
@@ -58,13 +92,15 @@ AtRule.prototype = Object.assign(new Node(), {
     },
 
     genCSS(context, output) {
-        const value = this.value, rules = this.rules;
+        const value = this.value, rules = this.rules || this.declarations;
         output.add(this.name, this.fileInfo(), this.getIndex());
         if (value) {
             output.add(' ');
             value.genCSS(context, output);
         }
-        if (rules) {
+        if (this.simpleBlock) {
+            this.outputRuleset(context, output, this.declarations);
+        } else if (rules) {
             this.outputRuleset(context, output, rules);
         } else {
             output.add(';');
@@ -72,8 +108,8 @@ AtRule.prototype = Object.assign(new Node(), {
     },
 
     eval(context) {
-        let mediaPathBackup, mediaBlocksBackup, value = this.value, rules = this.rules;
-
+        let mediaPathBackup, mediaBlocksBackup, value = this.value, rules = this.rules || this.declarations;
+ 
         // media stored inside other atrule should not bubble over it
         // backpup media bubbling information
         mediaPathBackup = context.mediaPath;
@@ -92,7 +128,9 @@ AtRule.prototype = Object.assign(new Node(), {
         let allAmpersands = false;
 
         if (rules) {
-            rules = [rules[0].eval(context)];
+            if (!this.simpleBlock) {
+                rules = [rules[0].eval(context)];
+            }
 
             let precedingSelectors = [];
 
@@ -138,12 +176,19 @@ AtRule.prototype = Object.assign(new Node(), {
             }
         }
 
-        // restore media bubbling information
-        context.mediaPath = mediaPathBackup;
-        context.mediaBlocks = mediaBlocksBackup;
+        if (this.simpleBlock && rules) {
+            rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
 
-        return new AtRule(this.name, value, rules,
-            this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
+            rules= rules.map(function (rule) { return rule.eval(context); });
+            context.mediaPath = mediaPathBackup;
+            context.mediaBlocks = mediaBlocksBackup;
+            return  new AtRule(this.name, value, rules, this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
+        } else {
+            // restore media bubbling information
+            context.mediaPath = mediaPathBackup;
+            context.mediaBlocks = mediaBlocksBackup;
+            return new AtRule(this.name, value, rules, this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
+        }
     },
 
     variable(name) {
