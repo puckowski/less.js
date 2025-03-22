@@ -85,11 +85,59 @@ AtRule.prototype = Object.assign(new Node(), {
         if (value) {
             value = value.eval(context);
         }
+
+        let ampersandCount = 0;
+        let noAmpersandCount = 0;
+        let noAmpersands = true;
+        let allAmpersands = false;
+
         if (rules) {
-            // assuming that there is only one rule at this point - that is how parser constructs the rule
             rules = [rules[0].eval(context)];
-            rules[0].root = true;
+
+            let precedingSelectors = [];
+
+            if (context.frames.length > 0) {
+                let index = 0;
+                for (index = 0; index < context.frames.length; index++) {
+                    if (
+                        context.frames[index].type === 'Ruleset' &&
+                        context.frames[index].rules &&
+                        context.frames[index].rules.length > 0
+                    ) {
+                        let current = context.frames[index];
+
+                        if (current && !current.root && current.selectors && current.selectors.length > 0 ) {
+                            precedingSelectors = precedingSelectors.concat(current.selectors);
+                        }
+                    }
+
+                    if (precedingSelectors.length > 0 ) {
+                        let value = '';
+                        const output = { add: function (s) { value += s; } };
+                        for (let i = 0; i < precedingSelectors.length; i++) {
+                            precedingSelectors[i].genCSS(context, output);
+                        }
+                        if (/^&+$/.test(value.replace(/\s+/g, ''))) {
+                            noAmpersands = false;
+                            noAmpersandCount++;
+                        } else {
+                            allAmpersands = false;
+                            ampersandCount++;
+                        }
+                    }
+                }
+            }
+
+            const mixedAmpersands = ampersandCount > 0 && noAmpersandCount > 0 && !allAmpersands && !noAmpersands;
+
+            if (
+                (this.isRooted && ampersandCount > 0 && noAmpersandCount === 0 && !allAmpersands && noAmpersands)
+                || !mixedAmpersands
+            ) {
+                rules[0].root = true;
+            }
         }
+
         // restore media bubbling information
         context.mediaPath = mediaPathBackup;
         context.mediaBlocks = mediaBlocksBackup;
