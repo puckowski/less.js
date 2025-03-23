@@ -21,29 +21,29 @@ const AtRule = function(
     this.value = (value instanceof Node) ? value : (value ? new Anonymous(value) : value);
     if (rules) {
         if (Array.isArray(rules)) {
-            const allDeclarations = rules.filter(function (node) { return node.type === 'Declaration'; }).length === rules.length;
-            let allDeclarations2 = true;
+            const allDeclarations = rules.filter(function (node) { return node.type === 'Declaration' && !node.merge; }).length === rules.length;
+           
+            let allRulesetDeclarations = true;
             rules.forEach(rule => {
-                if (rule.rules) allDeclarations2 = allDeclarations2 && rule.rules.filter(function (node) { return node.type === 'Declaration'; }).length === rule.rules.length
+                if (rule.type === 'Ruleset' && rule.rules) allRulesetDeclarations = allRulesetDeclarations && rule.rules.filter(function (node) { return node.type === 'Declaration'; }).length === rule.rules.length
             });
+
             if (allDeclarations && !isRooted) {
                 this.simpleBlock = true;
                 this.declarations = rules;
-            }
-            else if (allDeclarations2 && !isRooted && !value) {
+            } else if (allRulesetDeclarations && rules.length === 1 && !isRooted && !value) {
                 this.simpleBlock = true;
                 this.declarations = rules[0].rules;
-            }
-            else {
+            } else {
                 this.rules = rules;
             }
         } else {
             const allDeclarations = rules.rules.filter(function (node) { return node.type === 'Declaration' && !node.merge}).length === rules.rules.length;
+            
             if (allDeclarations && !isRooted && !value) {
                 this.simpleBlock = true;
                 this.declarations = rules.rules;
-            }
-            else {
+            } else {
                 this.rules = [rules];
                 this.rules[0].selectors = (new Selector([], null, null, index, currentFileInfo)).createEmptySelectors();
             }
@@ -122,73 +122,68 @@ AtRule.prototype = Object.assign(new Node(), {
             value = value.eval(context);
         }
 
+        if (rules) {
+            rules = this.evalRoot(context, rules);
+        }
+        if (this.simpleBlock && rules) {
+            rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
+            rules= rules.map(function (rule) { return rule.eval(context); });
+        }
+
+        // restore media bubbling information
+        context.mediaPath = mediaPathBackup;
+        context.mediaBlocks = mediaBlocksBackup;
+        return new AtRule(this.name, value, rules, this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
+    },
+
+    evalRoot(context, rules) {
         let ampersandCount = 0;
         let noAmpersandCount = 0;
         let noAmpersands = true;
         let allAmpersands = false;
 
-        if (rules) {
-            if (!this.simpleBlock) {
-                rules = [rules[0].eval(context)];
-            }
+        if (!this.simpleBlock) {
+            rules = [rules[0].eval(context)];
+        }
 
-            let precedingSelectors = [];
-
-            if (context.frames.length > 0) {
-                let index = 0;
-                for (index = 0; index < context.frames.length; index++) {
-                    if (
-                        context.frames[index].type === 'Ruleset' &&
-                        context.frames[index].rules &&
-                        context.frames[index].rules.length > 0
-                    ) {
-                        let current = context.frames[index];
-
-                        if (current && !current.root && current.selectors && current.selectors.length > 0 ) {
-                            precedingSelectors = precedingSelectors.concat(current.selectors);
-                        }
+        let precedingSelectors = [];
+        if (context.frames.length > 0) {
+            for (let index = 0; index < context.frames.length; index++) {
+                const frame = context.frames[index];
+                if (
+                    frame.type === 'Ruleset' &&
+                    frame.rules &&
+                    frame.rules.length > 0
+                ) {
+                    if (frame && !frame.root && frame.selectors && frame.selectors.length > 0) {
+                        precedingSelectors = precedingSelectors.concat(frame.selectors);
                     }
-
-                    if (precedingSelectors.length > 0 ) {
-                        let value = '';
-                        const output = { add: function (s) { value += s; } };
-                        for (let i = 0; i < precedingSelectors.length; i++) {
-                            precedingSelectors[i].genCSS(context, output);
-                        }
-                        if (/^&+$/.test(value.replace(/\s+/g, ''))) {
-                            noAmpersands = false;
-                            noAmpersandCount++;
-                        } else {
-                            allAmpersands = false;
-                            ampersandCount++;
-                        }
+                }
+                if (precedingSelectors.length > 0) {
+                    let value = '';
+                    const output = { add: function (s) { value += s; } };
+                    for (let i = 0; i < precedingSelectors.length; i++) {
+                        precedingSelectors[i].genCSS(context, output);
+                    }
+                    if (/^&+$/.test(value.replace(/\s+/g, ''))) {
+                        noAmpersands = false;
+                        noAmpersandCount++;
+                    } else {
+                        allAmpersands = false;
+                        ampersandCount++;
                     }
                 }
             }
-
-            const mixedAmpersands = ampersandCount > 0 && noAmpersandCount > 0 && !allAmpersands && !noAmpersands;
-
-            if (
-                (this.isRooted && ampersandCount > 0 && noAmpersandCount === 0 && !allAmpersands && noAmpersands)
-                || !mixedAmpersands
-            ) {
-                rules[0].root = true;
-            }
         }
 
-        if (this.simpleBlock && rules) {
-            rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();
-
-            rules= rules.map(function (rule) { return rule.eval(context); });
-            context.mediaPath = mediaPathBackup;
-            context.mediaBlocks = mediaBlocksBackup;
-            return  new AtRule(this.name, value, rules, this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
-        } else {
-            // restore media bubbling information
-            context.mediaPath = mediaPathBackup;
-            context.mediaBlocks = mediaBlocksBackup;
-            return new AtRule(this.name, value, rules, this.getIndex(), this.fileInfo(), this.debugInfo, this.isRooted, this.visibilityInfo());
+        const mixedAmpersands = ampersandCount > 0 && noAmpersandCount > 0 && !allAmpersands && !noAmpersands;
+        if (
+            (this.isRooted && ampersandCount > 0 && noAmpersandCount === 0 && !allAmpersands && noAmpersands)
+            || !mixedAmpersands
+        ) {
+            rules[0].root = true;
         }
+        return rules;
     },
 
     variable(name) {
