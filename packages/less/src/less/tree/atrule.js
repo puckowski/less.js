@@ -33,7 +33,7 @@ const AtRule = function(
                 this.declarations = rules;
             } else if (allRulesetDeclarations && rules.length === 1 && !isRooted && !value) {
                 this.simpleBlock = true;
-                this.declarations = rules[0].rules;
+                this.declarations = rules[0].rules ? rules[0].rules : rules;
             } else {
                 this.rules = rules;
             }
@@ -124,6 +124,15 @@ AtRule.prototype = Object.assign(new Node(), {
 
         if (rules) {
             rules = this.evalRoot(context, rules);
+        }
+        if (Array.isArray(rules) && rules[0].rules && Array.isArray(rules[0].rules) && rules[0].rules.length) {
+            var allMergeableDeclarations = rules[0].rules.filter(function (node) { return node.type === 'Declaration'; }).length === rules[0].rules.length;
+            var allDeclarations = rules[0].rules.filter(function (node) { return node.type === 'Declaration' && !node.merge; }).length === rules[0].rules.length;
+            if (!allDeclarations && allMergeableDeclarations && !this.isRooted && !value) {
+                var mergeRules = context.pluginManager.less.visitors.ToCSSVisitor.prototype._mergeRules;
+                mergeRules(rules[0].rules);
+                rules = rules[0].rules;
+            }
         }
         if (this.simpleBlock && rules) {
             rules[0].functionRegistry = context.frames[0].functionRegistry.inherit();

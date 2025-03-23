@@ -7164,39 +7164,26 @@
                 var allRulesetDeclarations_1 = true;
                 rules.forEach(function (rule) {
                     if (rule.type === 'Ruleset' && rule.rules)
-                        allRulesetDeclarations_1 = allRulesetDeclarations_1 && rule.rules.filter(function (node) { return node.type === 'Declaration' && !node.merge; }).length === rule.rules.length;
+                        allRulesetDeclarations_1 = allRulesetDeclarations_1 && rule.rules.filter(function (node) { return node.type === 'Declaration'; }).length === rule.rules.length;
                 });
                 if (allDeclarations && !isRooted) {
                     this.simpleBlock = true;
                     this.declarations = rules;
-                } /*else if (allRulesetDeclarations && rules.length === 1 && !isRooted && !value) {
+                }
+                else if (allRulesetDeclarations_1 && rules.length === 1 && !isRooted && !value) {
                     this.simpleBlock = true;
-                    this.declarations = rules[0].rules ? rules[0].rules : rules[0];
-                    console.log('def3: ' + (this.declarations !== null && this.declarations !== undefined));
-                    if (this.declarations === null || this.declarations === undefined) {
-                        console.log (rules[0]);
-                        console.log('---');
-                        console.log(rules);
-                    }
-                } */
+                    this.declarations = rules[0].rules;
+                }
                 else {
                     this.rules = rules;
                 }
             }
             else {
                 var allDeclarations = rules.rules.filter(function (node) { return node.type === 'Declaration' && !node.merge; }).length === rules.rules.length;
-                var allMergeableDeclarations_1 = true;
-                rules.rules.forEach(function (rule) {
-                    if (rule.rules)
-                        allMergeableDeclarations_1 = allMergeableDeclarations_1 && rule.rules.filter(function (node) { return node.type === 'Declaration'; }).length === rule.rules.length;
-                });
-                if (allDeclarations && !isRooted && !value && rules.rules) {
+                if (allDeclarations && !isRooted && !value) {
                     this.simpleBlock = true;
                     this.declarations = rules.rules;
-                } /*else if (!allDeclarations && allMergeableDeclarations && !isRooted && !value) {
-                    this.simpleBlock = true;
-                    this.declarations = rules.rules;
-                }*/
+                }
                 else {
                     this.rules = [rules];
                     this.rules[0].selectors = (new Selector([], null, null, index, currentFileInfo)).createEmptySelectors();
@@ -7266,7 +7253,7 @@
             if (Array.isArray(rules) && rules.length) {
                 var allMergeableDeclarations = rules.filter(function (node) { return node.type === 'Declaration'; }).length === rules.length;
                 var allDeclarations = rules.filter(function (node) { return node.type === 'Declaration' && !node.merge; }).length === rules.length;
-                if (!allDeclarations && allMergeableDeclarations && !this.isRooted) {
+                if (!allDeclarations && allMergeableDeclarations && !this.isRooted && !value) {
                     var mergeRules = context.pluginManager.less.visitors.ToCSSVisitor.prototype._mergeRules;
                     mergeRules(rules);
                 }
