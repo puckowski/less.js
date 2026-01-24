@@ -1959,65 +1959,6 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                 return features.length > 0 ? features : null;
             },
 
-            containerName: function () {
-                let name;
-                let ch;
-                let prev;
-
-                parserInput.save();
-
-                name = this.entities.variable() || this.entities.keyword();
-                if (!name) {
-                    parserInput.restore();
-                    return null;
-                }
-
-                if (name.type === 'Keyword' && name.value && name.value.toLowerCase() === 'not') {
-                    parserInput.restore();
-                    return null;
-                }
-
-                ch = parserInput.currentChar();
-                prev = parserInput.prevChar();
-
-                if (ch === '(' && prev && /^\s$/.test(prev)) {
-                    parserInput.forget();
-                    return name;
-                }
-
-                parserInput.restore();
-                return null;
-            },
-
-            containerFeatures: function () {
-                const name = this.containerName();
-                const features = this.mediaFeatures(ContainerSyntaxOptions);
-
-                return { name, features };
-            },
-
-            prepareAndGetContainerAtRule: function (index, debugInfo) {
-                const parsed = this.containerFeatures();
-                const rules = this.block();
-
-                if (!rules) {
-                    error('container definitions require block statements after any features');
-                }
-
-                if (!parsed.features) {
-                    error('container definitions require block statements after any features');
-                }
-
-                parserInput.forget();
-
-                const atRule = new (tree.Container)(rules, parsed.features, index + currentIndex, fileInfo, undefined, parsed.name);
-                if (context.dumpLineNumbers) {
-                    atRule.debugInfo = debugInfo;
-                }
-
-                return atRule;
-            },
-
             prepareAndGetNestableAtRule: function (treeType, index, debugInfo, syntaxOptions) {
                 const features = this.mediaFeatures(syntaxOptions);
 
@@ -2052,7 +1993,7 @@ const Parser = function Parser(context, imports, fileInfo, currentIndex) {
                     }
                     
                     if (parserInput.$str('@container')) {
-                        return this.prepareAndGetContainerAtRule(index, debugInfo);
+                        return this.prepareAndGetNestableAtRule(tree.Container, index, debugInfo, ContainerSyntaxOptions);
                     }
                 }
                 
