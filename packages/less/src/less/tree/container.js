@@ -7,86 +7,18 @@ import Expression from './expression';
 import NestableAtRulePrototype from './nested-at-rule';
 import * as utils from '../utils';
 
-const reservedContainerNameKeywords = new Set(['and', 'or', 'not']);
-
-const isContainerNameCandidate = function(node) {
-    if (!node) {
-        return false;
-    }
-    if (node.type === 'Keyword') {
-        const value = String(node.value).toLowerCase();
-        return !reservedContainerNameKeywords.has(value);
-    }
-    return node.type === 'Anonymous' || node.type === 'Variable' || node.type === 'Quoted';
-};
-
-const isContainerQueryContinuation = function(node) {
-    if (!node) {
-        return false;
-    }
-    if (node.type === 'Paren') {
-        return true;
-    }
-    if (node.type === 'Keyword' || node.type === 'Anonymous') {
-        const value = String(node.value).toLowerCase();
-        return reservedContainerNameKeywords.has(value);
-    }
-    return false;
-};
-
-const inferContainerNameAndFeatures = function(features) {
-    if (!Array.isArray(features) || features.length === 0) {
-        return { name: null, features, nameNoSpacing: false };
-    }
-
-    const first = features[0];
-
-    if (first instanceof Expression && Array.isArray(first.value) && first.value.length > 0) {
-        const nameNode = first.value[0];
-        if (isContainerNameCandidate(nameNode)) {
-            const nameNoSpacing = Boolean(first.value[1] && first.value[1].noSpacing);
-            if (first.value.length === 1) {
-                return { name: nameNode, features: features.slice(1), nameNoSpacing };
-            }
-
-            if (isContainerQueryContinuation(first.value[1])) {
-                const remainingExpression = new Expression(first.value.slice(1), first.noSpacing);
-                remainingExpression.parens = first.parens;
-                remainingExpression.parensInOp = first.parensInOp;
-
-                return {
-                    name: nameNode,
-                    features: [remainingExpression].concat(features.slice(1)),
-                    nameNoSpacing
-                };
-            }
-        }
-    }
-
-    if (isContainerNameCandidate(first) && features.length === 1) {
-        return { name: first, features: [], nameNoSpacing: false };
-    }
-
-    return { name: null, features, nameNoSpacing: false };
-};
-
 const Container = function(value, features, index, currentFileInfo, visibilityInfo) {
     this._index = index;
     this._fileInfo = currentFileInfo;
 
     const selectors = (new Selector([], null, null, this._index, this._fileInfo)).createEmptySelectors();
 
-    const inferred = inferContainerNameAndFeatures(features);
-
-    this.name = inferred.name || null;
-    this._nameNoSpacing = inferred.nameNoSpacing;
-    this.features = new Value(inferred.features);
+    this.features = new Value(features);
     this.rules = [new Ruleset(selectors, value)];
     this.rules[0].allowImports = true;
     this.copyVisibilityInfo(visibilityInfo);
     this.allowRoot = true;
     this.setParent(selectors, this);
-    this.setParent(this.name, this);
     this.setParent(this.features, this);
     this.setParent(this.rules, this);
 };
@@ -98,12 +30,6 @@ Container.prototype = Object.assign(new AtRule(), {
 
     genCSS(context, output) {
         output.add('@container ', this._fileInfo, this._index);
-        if (this.name) {
-            this.name.genCSS(context, output);
-            if (!this._nameNoSpacing) {
-                output.add(' ');
-            }
-        }
         this.features.genCSS(context, output);
         this.outputRuleset(context, output, this.rules);
     },
@@ -122,14 +48,6 @@ Container.prototype = Object.assign(new AtRule(), {
         if (this.debugInfo) {
             this.rules[0].debugInfo = this.debugInfo;
             media.debugInfo = this.debugInfo;
-        }
-
-        media.name = this.name;
-        media._nameNoSpacing = this._nameNoSpacing;
-        media.setParent(media.name, media);
-        if (this.name && this.name.eval) {
-            media.name = this.name.eval(context);
-            media.setParent(media.name, media);
         }
 
         media.features = this.features.eval(context);
@@ -155,23 +73,17 @@ Container.prototype = Object.assign(new AtRule(), {
         let value;
         const path = context.mediaPath.concat([this]);
 
-        // Extract the container-query conditions separated with `,` (OR),
-        // and include any container names in the feature list.
+        // Extract the container-query conditions separated with `,` (OR)
         for (i = 0; i < path.length; i++) {
             if (path[i].type !== this.type) {
                 context.mediaBlocks.splice(i, 1);
                 return this;
             }
 
-            const nameNode = path[i].name;
             value = path[i].features instanceof Value ?
                 path[i].features.value : path[i].features;
             const fragments = Array.isArray(value) ? value : [value];
-            if (nameNode) {
-                path[i] = fragments.map(fragment => new Expression([nameNode, fragment]));
-            } else {
-                path[i] = fragments;
-            }
+            path[i] = fragments;
         }
 
         // Trace all permutations to generate the resulting container-query.
@@ -185,7 +97,6 @@ Container.prototype = Object.assign(new AtRule(), {
             return new Expression(path);
         }));
         this.setParent(this.features, this);
-        this.name = null;
 
         // Fake a tree-node that doesn't output anything.
         return new Ruleset([], []);
